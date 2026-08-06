@@ -38,7 +38,7 @@ export async function syncPull(userId: string) {
     }
   }
 
-  // 2. Sincroniza Categorias (compartilhadas ou por usuário)
+  // 2. Sincroniza Categorias
   const { data: catsData } = await supabase.from('categories').select('*');
   if (catsData) {
     for (const cat of catsData) {
@@ -56,4 +56,22 @@ export async function syncPushTask(task: Task) {
 export async function syncPushCategory(category: Category) {
   await db.categories.put(category);
   await supabase.from('categories').upsert([category]);
+}
+
+// NOVO: Função para enviar anexos direto para o Supabase Storage na nuvem
+export async function uploadTaskAttachment(file: File, taskId: string): Promise<string> {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${taskId}/${crypto.randomUUID()}.${fileExt}`;
+  
+  const { error } = await supabase.storage
+    .from('attachments')
+    .upload(fileName, file);
+
+  if (error) throw error;
+
+  const { data: publicUrlData } = supabase.storage
+    .from('attachments')
+    .getPublicUrl(fileName);
+    
+  return publicUrlData.publicUrl;
 }
