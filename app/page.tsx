@@ -5,9 +5,10 @@ import { db, Task } from '../lib/db';
 import { startGeofenceWatcher } from '../lib/notifications';
 import Header from '../components/Header';
 import Navbar from '../components/Navbar';
+import QuickInputBar from '../components/QuickInputBar';
 import TaskModal from '../components/TaskModal';
 import TaskCard from '../components/TaskCard';
-import { Calendar, Star, CheckCircle2, Bookmark } from 'lucide-react';
+import { Calendar, Star, CheckCircle2 } from 'lucide-react';
 
 export default function Epicentro() {
   const [user, setUser] = useState<any>(null);
@@ -19,8 +20,6 @@ export default function Epicentro() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
     loadLocalAndSync();
-
-    // Inicia o motor de rastreamento de geolocalização e notificações em background
     startGeofenceWatcher();
   }, []);
 
@@ -46,6 +45,20 @@ export default function Epicentro() {
     }
   }
 
+  // Função para marcar/desmarcar o checklist direto no card
+  async function handleToggleCheck(taskId: string, checkId: string) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || !task.checklist) return;
+
+    const updatedChecklist = task.checklist.map(item => 
+      item.id === checkId ? { ...item, completed: !item.completed } : item
+    );
+
+    setTasks(tasks.map(t => t.id === taskId ? { ...t, checklist: updatedChecklist } : t));
+    await db.tasks.update(taskId, { checklist: updatedChecklist });
+    await supabase.from('tasks').update({ checklist: updatedChecklist }).eq('id', taskId);
+  }
+
   const filteredTasks = tasks.filter(task => {
     if (activeFilter === 'all') return true;
     if (activeFilter === 'important') return task.is_important;
@@ -53,7 +66,7 @@ export default function Epicentro() {
   });
 
   return (
-    <main className="min-h-screen bg-zinc-950 pb-32 text-zinc-100 font-sans">
+    <main className="min-h-screen bg-zinc-950 pb-36 text-zinc-100 font-sans">
       <Header user={user} />
       
       {/* Dashboard Tiles */}
@@ -61,7 +74,7 @@ export default function Epicentro() {
         <div className="grid grid-cols-2 gap-3 mb-3">
           <button 
             onClick={() => setActiveFilter('all')}
-            className={`p-4 rounded-3xl border text-left transition-all flex flex-col justify-between h-28 ${activeFilter === 'all' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200 shadow-lg shadow-indigo-600/10' : 'bg-zinc-900/40 border-zinc-800/80 text-zinc-300'}`}
+            className={`p-4 rounded-3xl border text-left transition-all flex flex-col justify-between h-28 ${activeFilter === 'all' ? 'bg-indigo-600/25 border-indigo-500 text-indigo-200 shadow-xl shadow-indigo-600/10' : 'bg-zinc-900/40 border-zinc-800/80 text-zinc-300'}`}
           >
             <div className="flex justify-between items-center w-full">
               <Calendar size={20} className="text-indigo-400" />
@@ -75,7 +88,7 @@ export default function Epicentro() {
 
           <button 
             onClick={() => setActiveFilter('important')}
-            className={`p-4 rounded-3xl border text-left transition-all flex flex-col justify-between h-28 ${activeFilter === 'important' ? 'bg-amber-500/20 border-amber-500 text-amber-200 shadow-lg shadow-amber-500/10' : 'bg-zinc-900/40 border-zinc-800/80 text-zinc-300'}`}
+            className={`p-4 rounded-3xl border text-left transition-all flex flex-col justify-between h-28 ${activeFilter === 'important' ? 'bg-amber-500/25 border-amber-500 text-amber-200 shadow-xl shadow-amber-500/10' : 'bg-zinc-900/40 border-zinc-800/80 text-zinc-300'}`}
           >
             <div className="flex justify-between items-center w-full">
               <Star size={20} className="text-amber-400" />
@@ -112,12 +125,17 @@ export default function Epicentro() {
               task={task} 
               onComplete={handleCompleteTask} 
               onEdit={(t) => { setEditingTask(t); setIsModalOpen(true); }} 
+              onToggleCheck={handleToggleCheck}
             />
           ))
         )}
       </div>
 
-      <Navbar onAddTask={() => { setEditingTask(null); setIsModalOpen(true); }} />
+      {/* Barra de Input Estilo Samsung */}
+      <QuickInputBar onClick={() => { setEditingTask(null); setIsModalOpen(true); }} />
+
+      {/* Navbar Minimalista Inferior */}
+      <Navbar />
 
       <TaskModal 
         isOpen={isModalOpen} 
