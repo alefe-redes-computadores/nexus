@@ -1,17 +1,17 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { db, Task } from '../lib/db';
-import { initAutoSync } from '../lib/sync';
-import { startGeofenceWatcher } from '../lib/notifications';
-import { useTasks } from '../hooks/useTasks';
-import Header from '../components/Header';
-import QuickInputBar from '../components/QuickInputBar';
-import TaskModal from '../components/TaskModal';
-import TaskCard from '../components/TaskCard';
-import ActivityClock from '../components/ActivityClock';
-import FocusModeModal from '../components/FocusModeModal';
-import { CheckCircle2, Search, X } from 'lucide-react';
+import { supabase } from './lib/supabase';
+import { db, Task } from './lib/db';
+import { initAutoSync } from './lib/sync';
+import { startGeofenceWatcher } from './lib/notifications';
+import { useTasks } from './hooks/useTasks';
+import Header from './components/Header';
+import QuickInputBar from './components/QuickInputBar';
+import TaskModal from './components/TaskModal';
+import TaskCard from './components/TaskCard';
+import ActivityClock from './components/ActivityClock';
+import FocusModeModal from './components/FocusModeModal';
+import { CheckCircle2, Search, X, EyeOff, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Epicentro() {
@@ -52,28 +52,32 @@ export default function Epicentro() {
     <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100 font-sans">
       <Header />
       
-      {/* Widget de Atividades / Zona de Foco Inteligente e Integrada */}
+      {/* Widget de Foco Moderno (Sem card duplo espremido) */}
       <div className="px-6 mt-4">
         {isClockVisible ? (
-          <div className="relative bg-zinc-900/60 border border-zinc-800/80 rounded-3xl p-4 backdrop-blur-xl shadow-xl transition-all">
-            <div className="flex justify-end mb-1">
+          <div className="relative">
+            {/* Linha de controle minimalista estilo app moderno */}
+            <div className="flex justify-between items-center mb-2 px-1">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Painel de Imersão</span>
               <button 
                 onClick={() => setIsClockVisible(false)}
-                className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors"
+                className="text-[10px] font-semibold text-zinc-400 hover:text-zinc-200 transition-colors flex items-center gap-1"
               >
-                Ocultar
+                <EyeOff size={12} /> Ocultar
               </button>
             </div>
             
             <ActivityClock tasks={tasks} onOpenFocus={() => setIsFocusOpen(true)} />
           </div>
         ) : (
-          <button 
-            onClick={() => setIsClockVisible(true)}
-            className="w-full py-2.5 bg-zinc-900/40 border border-zinc-800/60 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-indigo-400 transition-all flex items-center justify-center gap-2 shadow-sm"
-          >
-            <span>+ Exibir Zona de Foco</span>
-          </button>
+          <div className="flex justify-end mb-2">
+            <button 
+              onClick={() => setIsClockVisible(true)}
+              className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1 px-1"
+            >
+              <Eye size={12} /> Exibir Painel de Foco
+            </button>
+          </div>
         )}
       </div>
 
