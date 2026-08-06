@@ -1,5 +1,5 @@
 'use client';
-import { LayoutGrid, Archive, Settings } from 'lucide-react';
+import { LayoutGrid, Archive } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 
 export default function Navbar() {
@@ -23,14 +23,6 @@ export default function Navbar() {
           title="Arquivados"
         >
           <Archive size={22} />
-        </button>
-
-        <button 
-          onClick={() => router.push('/settings')} 
-          className={`p-3 rounded-2xl transition-all ${pathname === '/settings' ? 'text-indigo-400 bg-indigo-500/10' : 'text-zinc-500 hover:text-zinc-300'}`}
-          title="Configurações"
-        >
-          <Settings size={22} />
         </button>
       </div>
     </nav>
