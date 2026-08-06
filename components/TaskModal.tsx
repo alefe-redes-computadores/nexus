@@ -1,9 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Plus, Heart, User, Briefcase, FileText, Coffee, Bookmark } from 'lucide-react';
+import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Plus, Heart, User, Briefcase, FileText, Coffee, Bookmark, Smile, Dumbbell, Home, ShoppingBag, Car, Plane, Shield, Zap, BookOpen, Music, Code } from 'lucide-react';
 import { db, Task, CheckItem, Category } from '../lib/db';
 import { supabase } from '../lib/supabase';
-import { syncPushTask } from '../lib/sync'; // <-- Única importação nova
+import { syncPushTask } from '../lib/sync';
+import { triggerHaptic } from '../lib/haptics';
 import dynamic from 'next/dynamic';
 
 const MapPicker = dynamic(() => import('./MapPicker'), { ssr: false });
@@ -16,13 +17,10 @@ interface TaskModalProps {
   initialTask?: Task | null;
 }
 
-const AVAILABLE_ICONS = [
-  { name: 'Pessoal', icon: User },
-  { name: 'Saúde', icon: Heart },
-  { name: 'Trabalho', icon: Briefcase },
-  { name: 'Documentos', icon: FileText },
-  { name: 'Alimentação', icon: Coffee },
-  { name: 'Geral', icon: Bookmark },
+// Lista completa de ícones categorizados para o modal avançado
+const ICON_CATEGORIES = [
+  { category: 'Geral', icons: [User, Heart, Briefcase, FileText, Coffee, Bookmark, Home, ShoppingBag] },
+  { category: 'Estilo de Vida', icons: [Smile, Dumbbell, Car, Plane, Shield, Zap, BookOpen, Music, Code] }
 ];
 
 export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, initialTask }: TaskModalProps) {
@@ -45,6 +43,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   const [showNewCatInput, setShowNewCatInput] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('User');
+  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
 
   const [isListening, setIsListening] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -71,6 +70,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   async function handleAddCategory(e: React.FormEvent) {
     e.preventDefault();
     if (!newCatName.trim()) return;
+    triggerHaptic('success');
     await db.categories.add({ name: newCatName.trim(), icon: selectedIcon });
     setNewCatName('');
     setShowNewCatInput(false);
@@ -78,14 +78,9 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     setCategory(newCatName.trim());
   }
 
-  if (!isOpen) return null;
-
   function handleVoiceInput() {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert('Seu navegador não suporta ditado por voz.');
-      return;
-    }
+    if (!SpeechRecognition) return alert('Seu navegador não suporta ditado por voz.');
     const recognition = new SpeechRecognition();
     recognition.lang = 'pt-BR';
     recognition.onstart = () => setIsListening(true);
@@ -100,11 +95,13 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
 
   function addChecklistItem() {
     if (!newCheckText.trim()) return;
+    triggerHaptic('light');
     setChecklist([...checklist, { id: Math.random().toString(), text: newCheckText, completed: false }]);
     setNewCheckText('');
   }
 
   function toggleCheckItem(id: string) {
+    triggerHaptic('light');
     setChecklist(checklist.map(item => item.id === id ? { ...item, completed: !item.completed } : item));
   }
 
@@ -131,8 +128,8 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     };
 
     try {
-      // Alteração aqui: Chamando a função de sincronização automática
-      await syncPushTask(taskData); 
+      triggerHaptic('success');
+      await syncPushTask(taskData);
       onTaskCreated();
       onClose();
     } catch (err) {
@@ -142,8 +139,14 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     }
   }
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4 overflow-y-auto">
+    // Clicar no fundo fecha o modal (Backdrop Click)
+    <div 
+      onClick={(e) => { if (e.target === e.currentTarget) { triggerHaptic('light'); onClose(); } }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4 overflow-y-auto"
+    >
       <div className="w-full max-w-lg rounded-t-[32px] sm:rounded-3xl border border-zinc-800 bg-zinc-900/95 backdrop-blur-2xl p-6 shadow-2xl animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto font-sans">
         
         <div className="flex justify-between items-center mb-5">
@@ -153,13 +156,13 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
           <div className="flex items-center gap-1.5">
             <button 
               type="button" 
-              onClick={() => setIsImportant(!isImportant)} 
+              onClick={() => { triggerHaptic('light'); setIsImportant(!isImportant); }} 
               className={`p-2.5 rounded-2xl transition-all ${isImportant ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-zinc-800/80 text-zinc-400 border border-zinc-700/50'}`}
               title="Marcar como Importante"
             >
               <Star size={16} fill={isImportant ? 'currentColor' : 'none'} />
             </button>
-            <button onClick={onClose} className="p-2.5 rounded-2xl bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 hover:text-white transition-all">
+            <button onClick={() => { triggerHaptic('light'); onClose(); }} className="p-2.5 rounded-2xl bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 hover:text-white transition-all">
               <X size={16} />
             </button>
           </div>
@@ -171,7 +174,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               autoFocus
               type="text"
               className="w-full bg-zinc-950/60 border border-zinc-800 rounded-2xl p-4 pr-12 text-sm outline-none focus:border-indigo-500 text-zinc-100 placeholder-zinc-500 transition-all shadow-inner"
-              placeholder="O que precisa ser feito? (Ex: Comprar remédio na farmácia)"
+              placeholder="O que precisa ser feito? (Ex: Tomar Metadona 5mg)"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -190,7 +193,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Categoria / Lista</label>
               <button 
                 type="button" 
-                onClick={() => setShowNewCatInput(!showNewCatInput)}
+                onClick={() => { triggerHaptic('light'); setShowNewCatInput(!showNewCatInput); }}
                 className="text-[11px] text-indigo-400 font-semibold flex items-center gap-1"
               >
                 <Plus size={12} /> Nova Categoria
@@ -198,32 +201,23 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
             </div>
 
             {showNewCatInput && (
-              <div className="space-y-2 mb-3 p-3 bg-zinc-950 border border-zinc-800 rounded-2xl">
+              <div className="space-y-3 mb-3 p-3.5 bg-zinc-950 border border-zinc-800 rounded-2xl animate-in fade-in">
                 <input 
                   type="text" 
-                  placeholder="Nome da categoria..." 
+                  placeholder="Nome da categoria (Ex: Remédios)..." 
                   value={newCatName} 
                   onChange={e => setNewCatName(e.target.value)} 
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 outline-none"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-zinc-100 outline-none"
                 />
-                <div className="flex gap-2 items-center">
-                  <span className="text-[10px] text-zinc-500">Ícone:</span>
-                  <div className="flex gap-1 overflow-x-auto">
-                    {AVAILABLE_ICONS.map(item => {
-                      const IconComponent = item.icon;
-                      return (
-                        <button
-                          key={item.name}
-                          type="button"
-                          onClick={() => setSelectedIcon(item.name)}
-                          className={`p-2 rounded-lg border ${selectedIcon === item.name ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}
-                        >
-                          <IconComponent size={14} />
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <button type="button" onClick={handleAddCategory} className="ml-auto px-3 py-1.5 bg-indigo-600 text-xs font-bold text-white rounded-xl">Criar</button>
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setIsIconPickerOpen(true)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-indigo-300 font-semibold"
+                  >
+                    <span>Escolher Ícone</span>
+                  </button>
+                  <button type="button" onClick={handleAddCategory} className="px-4 py-2 bg-indigo-600 text-xs font-bold text-white rounded-xl">Criar Categoria</button>
                 </div>
               </div>
             )}
@@ -233,7 +227,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                 <button 
                   key={cat.id || cat.name}
                   type="button"
-                  onClick={() => setCategory(cat.name)}
+                  onClick={() => { triggerHaptic('light'); setCategory(cat.name); }}
                   className={`px-3.5 py-2 rounded-xl text-xs font-semibold shrink-0 transition-all ${
                     category === cat.name 
                       ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-bold' 
@@ -251,21 +245,21 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => setReminderType('none')}
+                onClick={() => { triggerHaptic('light'); setReminderType('none'); }}
                 className={`py-2 text-xs rounded-xl font-medium border transition-all ${reminderType === 'none' ? 'bg-zinc-700 border-zinc-500 text-white font-bold' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}
               >
                 Padrão
               </button>
               <button
                 type="button"
-                onClick={() => setReminderType('time')}
+                onClick={() => { triggerHaptic('light'); setReminderType('time'); }}
                 className={`flex items-center justify-center gap-1.5 py-2 text-xs rounded-xl font-medium border transition-all ${reminderType === 'time' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 font-bold' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}
               >
                 <Clock size={14} /> Horário
               </button>
               <button
                 type="button"
-                onClick={() => setReminderType('location')}
+                onClick={() => { triggerHaptic('light'); setReminderType('location'); }}
                 className={`flex items-center justify-center gap-1.5 py-2 text-xs rounded-xl font-medium border transition-all ${reminderType === 'location' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 font-bold' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}
               >
                 <MapPin size={14} /> Local
@@ -332,6 +326,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
             </div>
           )}
 
+          {/* Checklist */}
           <div className="p-3.5 bg-zinc-950/40 border border-zinc-800/80 rounded-2xl space-y-2.5">
             <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
               <CheckSquare size={14} className="text-indigo-400" /> Checklist (Subtarefas)
@@ -370,7 +365,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               <input 
                 type="text"
                 className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none text-zinc-200 placeholder-zinc-600"
-                placeholder="Adicionar item (Ex: Mytedom 10mg)..."
+                placeholder="Adicionar item..."
                 value={newCheckText}
                 onChange={(e) => setNewCheckText(e.target.value)}
               />
@@ -393,6 +388,41 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
           </button>
         </form>
       </div>
+
+      {/* MODAL SELETOR DE ÍCONES AVANÇADO */}
+      {isIconPickerOpen && (
+        <div className="fixed inset-0 z-60 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-5 space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-bold text-zinc-100">Escolha um Ícone</h3>
+              <button onClick={() => setIsIconPickerOpen(false)} className="p-2 text-zinc-400 hover:text-white"><X size={16} /></button>
+            </div>
+            <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
+              {ICON_CATEGORIES.map((group) => (
+                <div key={group.category} className="space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">{group.category}</span>
+                  <div className="grid grid-cols-4 gap-2">
+                    {group.icons.map((IconComp: any, idx: number) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setSelectedIcon(group.category); // Simplificado ou nome do ícone
+                          setIsIconPickerOpen(false);
+                          triggerHaptic('success');
+                        }}
+                        className="p-3 bg-zinc-950 border border-zinc-800 rounded-2xl flex items-center justify-center text-zinc-300 hover:bg-indigo-600 hover:text-white transition-all"
+                      >
+                        <IconComp size={18} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
