@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { db } from '../lib/db';
-import { User as UserIcon, Settings, LogOut } from 'lucide-react';
+import { User as UserIcon, Settings, Archive, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function Header() {
@@ -12,12 +12,10 @@ export default function Header() {
   const router = useRouter();
 
   useEffect(() => {
-    // Busca o usuário completo autenticado no Supabase
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) setUser(data.user);
     });
 
-    // Fecha o menu ao clicar fora
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setMenuOpen(false);
@@ -33,7 +31,6 @@ export default function Header() {
     router.push('/');
   }
 
-  // Varredura ampla em todas as possíveis origens da foto do Google no Supabase
   const avatar = 
     user?.user_metadata?.avatar_url || 
     user?.user_metadata?.picture || 
@@ -76,6 +73,13 @@ export default function Header() {
               <p className="text-[10px] text-zinc-500 truncate">{user?.email}</p>
             </div>
             
+            <button 
+              onClick={() => { setMenuOpen(false); router.push('/archive'); }}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800/60 transition-all text-left"
+            >
+              <Archive size={15} className="text-indigo-400" /> Arquivados
+            </button>
+
             <button 
               onClick={() => { setMenuOpen(false); router.push('/settings'); }}
               className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800/60 transition-all text-left"
