@@ -1,4 +1,4 @@
-a'use client';
+'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { db } from '../../lib/db';
@@ -15,7 +15,6 @@ export default function ArchivePage() {
   }, []);
 
   async function loadArchived() {
-    // Busca do banco local (Dexie)
     const local = await db.tasks.where('status').equals('archived').toArray();
     setArchivedTasks(local);
   }
@@ -33,14 +32,13 @@ export default function ArchivePage() {
             archivedTasks.map(task => (
               <div key={task.id} className="p-4 rounded-2xl border border-zinc-800 bg-zinc-900/20 opacity-70">
                 <h3 className="font-medium text-zinc-400 line-through">{task.title}</h3>
-                <span className="text-[10px] uppercase text-zinc-600">{task.pillar}</span>
+                <span className="text-[10px] uppercase text-zinc-600">{task.category || task.pillar}</span>
               </div>
             ))
           )}
         </div>
       </div>
       
-      {/* Navbar não precisa de onAddTask aqui, então passamos uma função vazia */}
       <Navbar onAddTask={() => {}} />
     </main>
   );
