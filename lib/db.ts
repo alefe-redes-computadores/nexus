@@ -9,7 +9,7 @@ export interface CheckItem {
 export interface Category {
   id?: string;
   name: string;
-  icon: string; // Emoji ou ícone
+  icon: string; // Nome do ícone Lucide
 }
 
 export interface Task {
@@ -38,7 +38,7 @@ export class MyDatabase extends Dexie {
 
   constructor() {
     super('NexusDB');
-    this.version(4).stores({
+    this.version(5).stores({
       tasks: '++id, user_id, category, status, is_important, reminder_type',
       categories: '++id, name'
     });
