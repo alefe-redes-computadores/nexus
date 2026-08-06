@@ -9,7 +9,8 @@ export interface CheckItem {
 export interface Category {
   id?: string;
   name: string;
-  icon: string; // Nome do ícone Lucide
+  icon: string;
+  user_id?: string;
 }
 
 export interface Task {
@@ -38,9 +39,10 @@ export class MyDatabase extends Dexie {
 
   constructor() {
     super('NexusDB');
+    // Índices otimizados para busca instantânea mesmo com milhares de registros
     this.version(5).stores({
-      tasks: '++id, user_id, category, status, is_important, reminder_type',
-      categories: '++id, name'
+      tasks: 'id, user_id, category, status, is_important, reminder_type',
+      categories: 'id, name'
     });
   }
 }
