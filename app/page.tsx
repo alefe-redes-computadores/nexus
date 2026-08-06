@@ -5,6 +5,7 @@ import { db } from '../lib/db';
 import Header from '../components/Header';
 import Navbar from '../components/Navbar';
 import TaskModal from '../components/TaskModal';
+import TaskCard from '../components/TaskCard';
 import { Briefcase, User, Heart } from 'lucide-react';
 
 export default function Epicentro() {
@@ -19,16 +20,28 @@ export default function Epicentro() {
   }, []);
 
   async function loadLocalAndSync() {
-    // 1. Pega do Dexie (Local-First instantâneo)
     const localTasks = await db.tasks.where('status').equals('pending').toArray();
     setTasks(localTasks);
 
-    // 2. Busca atualizações do Supabase em segundo plano
     const { data: remoteTasks } = await supabase.from('tasks').select('*').eq('status', 'pending');
     if (remoteTasks) {
       await db.tasks.clear();
       await db.tasks.bulkAdd(remoteTasks);
       setTasks(remoteTasks);
+    }
+  }
+
+  // Função para concluir/arquivar a tarefa (Local-First)
+  async function handleCompleteTask(id: string) {
+    try {
+      // 1. Atualiza localmente no Dexie (some da tela instantaneamente)
+      await db.tasks.update(id, { status: 'archived' });
+      setTasks(prev => prev.filter(t => t.id !== id));
+
+      // 2. Atualiza no Supabase em background
+      await supabase.from('tasks').update({ status: 'archived' }).eq('id', id);
+    } catch (err) {
+      console.error('Erro ao arquivar tarefa:', err);
     }
   }
 
@@ -41,28 +54,28 @@ export default function Epicentro() {
       <Header user={user} />
       
       {/* Filtros de Pilares */}
-      <div className="px-6 mb-6 flex gap-2">
+      <div className="px-6 mb-6 flex gap-2 overflow-x-auto no-scrollbar">
         <button 
           onClick={() => setActivePillar('all')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${activePillar === 'all' ? 'bg-zinc-200 text-zinc-950' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}`}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activePillar === 'all' ? 'bg-zinc-200 text-zinc-950' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}`}
         >
           Todos
         </button>
         <button 
           onClick={() => setActivePillar('empresa')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${activePillar === 'empresa' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}`}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activePillar === 'empresa' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}`}
         >
           <Briefcase size={14} /> Empresa
         </button>
         <button 
           onClick={() => setActivePillar('pessoal')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${activePillar === 'pessoal' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}`}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activePillar === 'pessoal' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}`}
         >
           <User size={14} /> Pessoal
         </button>
         <button 
           onClick={() => setActivePillar('saude')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${activePillar === 'saude' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}`}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activePillar === 'saude' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}`}
         >
           <Heart size={14} /> Saúde
         </button>
@@ -71,18 +84,12 @@ export default function Epicentro() {
       {/* Lista de Tarefas */}
       <div className="px-6 space-y-3">
         {filteredTasks.length === 0 ? (
-          <div className="text-center py-12 text-zinc-600 text-sm">
-            Nenhuma tarefa encontrada neste pilar.
+          <div className="text-center py-16 text-zinc-600 text-sm">
+            Nenhuma tarefa pendente neste pilar.
           </div>
         ) : (
           filteredTasks.map(task => (
-            <div key={task.id || task.title} className="p-4 rounded-2xl border border-zinc-800/80 bg-zinc-900/40 backdrop-blur-sm flex flex-col gap-1">
-              <h3 className="font-medium text-sm text-zinc-200">{task.title}</h3>
-              {task.description && <p className="text-xs text-zinc-400">{task.description}</p>}
-              <span className="mt-2 text-[10px] uppercase font-bold tracking-widest text-indigo-400 w-fit px-2 py-0.5 rounded bg-indigo-500/10">
-                {task.pillar}
-              </span>
-            </div>
+            <TaskCard key={task.id} task={task} onComplete={handleCompleteTask} />
           ))
         )}
       </div>
