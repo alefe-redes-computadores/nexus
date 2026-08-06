@@ -1,5 +1,5 @@
 'use client';
-import { Check, Star, Heart, User, Briefcase, FileText, Coffee, Bookmark, Square, CheckSquare, Edit3 } from 'lucide-react';
+import { Check, Star, Heart, User, Briefcase, FileText, Coffee, Bookmark, Square, CheckSquare, Edit3, Image as ImageIcon } from 'lucide-react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { triggerHaptic } from '../lib/haptics';
 
@@ -105,6 +105,25 @@ export default function TaskCard({ task, sectionType, onComplete, onEdit, onTogg
                 {item.completed ? <CheckSquare size={14} className="text-indigo-400 shrink-0" /> : <Square size={14} className="text-zinc-600 shrink-0" />}
                 <span className={item.completed ? 'line-through text-zinc-600' : 'text-zinc-300'}>{item.text}</span>
               </div>
+            ))}
+          </div>
+        )}
+
+        {/* Preview de Anexos Direto no Card */}
+        {task.attachments && task.attachments.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pt-2 border-t border-zinc-800/80 mt-1">
+            {task.attachments.map((file: any, idx: number) => (
+              <a 
+                key={idx}
+                href={file.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-800/80 hover:bg-zinc-700 rounded-xl text-[10px] text-indigo-300 font-medium transition-all border border-zinc-700/50"
+              >
+                <ImageIcon size={12} className="text-indigo-400" />
+                <span className="truncate max-w-[120px]">{file.name}</span>
+              </a>
             ))}
           </div>
         )}
