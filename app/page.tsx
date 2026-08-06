@@ -1,98 +1,106 @@
-// app/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Briefcase, User, Activity, LogOut } from 'lucide-react';
+import { Plus, Briefcase, User, Heart, X, Check, Archive } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-export default function HomePage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
+export default function Epicentro() {
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newTask, setNewTask] = useState({ title: '', pillar: 'pessoal' });
 
-  // Verifica se o usuário está logado ao abrir o app
+  // Busca e Carregamento
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        // Se não tiver sessão, manda pro login
-        router.push('/login');
-      } else {
-        // Se estiver logado, libera a tela
-        setLoading(false);
-      }
-    };
-    
-    checkUser();
-  }, [router]);
+    loadTasks();
+  }, []);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
-  };
+  async function loadTasks() {
+    const { data } = await supabase.from('tasks').select('*').eq('status', 'pending');
+    setTasks(data || []);
+  }
 
-  // Tela de carregamento enquanto verifica a segurança
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[80vh]">
-        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
+  // Função de Arquivamento (Swipe lógico)
+  async function archiveTask(id: string) {
+    await supabase.from('tasks').update({ status: 'archived' }).eq('id', id);
+    loadTasks();
+  }
+
+  // Função de Criação
+  async function addTask() {
+    if (!newTask.title) return;
+    await supabase.from('tasks').insert([newTask]);
+    setIsModalOpen(false);
+    setNewTask({ title: '', pillar: 'pessoal' });
+    loadTasks();
   }
 
   return (
-    <div className="flex flex-col gap-6 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
-      <header className="flex items-center justify-between mt-2">
+    <main className="min-h-screen bg-zinc-950 p-6 text-zinc-100 font-sans">
+      <header className="mb-8 mt-4 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Sua Rotina</h1>
-          <p className="text-zinc-400 text-sm mt-1">O que vamos focar hoje?</p>
+          <h1 className="text-2xl font-bold tracking-tight">Epicentro</h1>
+          <p className="text-sm text-zinc-500">Gestão Integrada</p>
         </div>
-        <button 
-          onClick={handleLogout}
-          className="p-3 bg-zinc-900/80 border border-zinc-800 rounded-2xl text-zinc-400 hover:text-rose-400 transition-colors"
-        >
-          <LogOut className="w-5 h-5" />
-        </button>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 mt-4">
-        
-        {/* Card Empresa */}
-        <button className="flex items-center gap-4 p-5 bg-zinc-900/80 border border-zinc-800/80 rounded-3xl hover:bg-zinc-800/80 transition-all text-left">
-          <div className="p-4 bg-indigo-500/10 rounded-2xl text-indigo-400">
-            <Briefcase className="w-7 h-7" />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-zinc-100">Empresa</h2>
-            <p className="text-sm text-zinc-500 mt-1">Tarefas corporativas e prazos</p>
-          </div>
-        </button>
-
-        {/* Card Pessoal */}
-        <button className="flex items-center gap-4 p-5 bg-zinc-900/80 border border-zinc-800/80 rounded-3xl hover:bg-zinc-800/80 transition-all text-left">
-          <div className="p-4 bg-emerald-500/10 rounded-2xl text-emerald-400">
-            <User className="w-7 h-7" />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-zinc-100">Pessoal</h2>
-            <p className="text-sm text-zinc-500 mt-1">Rotinas diárias e metas</p>
-          </div>
-        </button>
-
-        {/* Card Saúde */}
-        <button className="flex items-center gap-4 p-5 bg-zinc-900/80 border border-zinc-800/80 rounded-3xl hover:bg-zinc-800/80 transition-all text-left">
-          <div className="p-4 bg-rose-500/10 rounded-2xl text-rose-400">
-            <Activity className="w-7 h-7" />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-zinc-100">Saúde</h2>
-            <p className="text-sm text-zinc-500 mt-1">Medicamentos e consultas</p>
-          </div>
-        </button>
-
+      {/* Lista de Tarefas com animação */}
+      <div className="space-y-3">
+        <AnimatePresence>
+          {tasks.map((task) => (
+            <motion.div 
+              key={task.id}
+              exit={{ x: -100, opacity: 0 }}
+              className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4"
+            >
+              <div>
+                <h3 className="font-semibold">{task.title}</h3>
+                <span className="text-[10px] uppercase tracking-widest text-zinc-500">{task.pillar}</span>
+              </div>
+              <button 
+                onClick={() => archiveTask(task.id)}
+                className="p-2 text-zinc-600 hover:text-indigo-400 transition-colors"
+              >
+                <Archive size={18} />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
-    </div>
+
+      {/* FAB de Adicionar */}
+      <button 
+        onClick={() => setIsModalOpen(true)}
+        className="fixed bottom-8 right-8 flex h-16 w-16 items-center justify-center rounded-full bg-indigo-600 text-white shadow-xl shadow-indigo-900/20 active:scale-95 transition-transform"
+      >
+        <Plus size={30} />
+      </button>
+
+      {/* Modal de Criação */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-6">
+          <div className="w-full max-w-sm rounded-3xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-bold">Nova Tarefa</h2>
+              <button onClick={() => setIsModalOpen(false)}><X size={20}/></button>
+            </div>
+            <input 
+              autoFocus
+              className="w-full bg-zinc-800 rounded-xl p-4 mb-4 outline-none"
+              placeholder="O que precisa ser feito?"
+              onChange={(e) => setNewTask({...newTask, title: e.target.value})}
+            />
+            <div className="flex gap-2 mb-6">
+              {['empresa', 'pessoal', 'saude'].map(p => (
+                <button key={p} onClick={() => setNewTask({...newTask, pillar: p})} className={`flex-1 py-2 text-xs rounded-lg capitalize ${newTask.pillar === p ? 'bg-indigo-600' : 'bg-zinc-800'}`}>
+                  {p}
+                </button>
+              ))}
+            </div>
+            <button onClick={addTask} className="w-full py-4 bg-indigo-600 rounded-xl font-bold">Criar Tarefa</button>
+          </div>
+        </div>
+      )}
+    </main>
   );
 }
