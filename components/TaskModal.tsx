@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { X, Clock, MapPin } from 'lucide-react';
-import { db, Task } from '../lib/db';
+import { X, Clock, MapPin, Mic, CheckSquare, Paperclip, Star } from 'lucide-react';
+import { db, Task, CheckItem } from '../lib/db';
 import { supabase } from '../lib/supabase';
 
 interface TaskModalProps {
@@ -9,190 +9,224 @@ interface TaskModalProps {
   onClose: () => void;
   onTaskCreated: () => void;
   userId: string;
+  initialTask?: Task | null; // Se passado, funciona como tela de Edição!
 }
 
-export default function TaskModal({ isOpen, onClose, onTaskCreated, userId }: TaskModalProps) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [pillar, setPillar] = useState<'empresa' | 'pessoal' | 'saude'>('pessoal');
+export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, initialTask }: TaskModalProps) {
+  const [title, setTitle] = useState(initialTask?.title || '');
+  const [description, setDescription] = useState(initialTask?.description || '');
+  const [category, setCategory] = useState(initialTask?.category || 'pessoal');
+  const [isImportant, setIsImportant] = useState(initialTask?.is_important || false);
+  const [checklist, setChecklist] = useState<CheckItem[]>(initialTask?.checklist || []);
+  const [newCheckText, setNewCheckText] = useState('');
   
-  // Estados para as regras avançadas de lembrete
-  const [reminderType, setReminderType] = useState<'none' | 'time' | 'location'>('none');
-  const [reminderTime, setReminderTime] = useState('');
-  const [radiusMeters, setRadiusMeters] = useState(100); // Raio padrão de 100m
-  const [locationName, setLocationName] = useState('');
+  const [reminderType, setReminderType] = useState<'none' | 'time' | 'location'>(initialTask?.reminder_type || 'none');
+  const [reminderTime, setReminderTime] = useState(initialTask?.reminder_time || '');
+  const [recurrence, setRecurrence] = useState<any>(initialTask?.recurrence || 'none');
+  const [isListening, setIsListening] = useState(false);
   const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
-  async function handleCreate(e: React.FormEvent) {
+  // Função de Reconhecimento de Voz (Estilo Samsung Voice Input)
+  function handleVoiceInput() {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Seu navegador não suporta ditado por voz.');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.onstart = () => setIsListening(true);
+    recognition.onresult = (event: any) => {
+      const speechText = event.results[0][0].transcript;
+      setTitle(speechText);
+      setIsListening(false);
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+    recognition.start();
+  }
+
+  function addChecklistItem() {
+    if (!newCheckText.trim()) return;
+    setChecklist([...checklist, { id: Math.random().toString(), text: newCheckText, completed: false }]);
+    setNewCheckText('');
+  }
+
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
 
     setLoading(true);
 
-    const newTask: Task & { reminder_type?: string; reminder_time?: string; radius_meters?: number; location_name?: string } = {
+    const taskData: Task = {
       user_id: userId,
       title,
       description,
-      pillar,
-      status: 'pending',
+      category,
+      pillar: 'pessoal',
+      status: initialTask?.status || 'pending',
+      is_important: isImportant,
+      checklist,
+      recurrence,
       reminder_type: reminderType,
       reminder_time: reminderType === 'time' ? reminderTime : undefined,
-      radius_meters: reminderType === 'location' ? radiusMeters : undefined,
-      location_name: reminderType === 'location' ? locationName : undefined,
     };
 
     try {
-      // Salva localmente (Local-First)
-      await db.tasks.add(newTask);
+      if (initialTask?.id) {
+        // Modo Edição
+        await db.tasks.update(initialTask.id, taskData);
+        await supabase.from('tasks').update(taskData).eq('id', initialTask.id);
+      } else {
+        // Modo Criação
+        await db.tasks.add(taskData);
+        await supabase.from('tasks').insert([taskData]);
+      }
 
-      // Sincroniza com o Supabase em background
-      const { error } = await supabase.from('tasks').insert([newTask]);
-      if (error) console.error('Erro ao sincronizar:', error);
-
-      // Limpa os campos
-      setTitle('');
-      setDescription('');
-      setReminderType('none');
-      setReminderTime('');
-      setLocationName('');
       onTaskCreated();
       onClose();
     } catch (err) {
-      console.error('Erro ao criar tarefa:', err);
+      console.error('Erro ao salvar tarefa:', err);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
-      <div className="w-full max-w-md rounded-3xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl animate-in fade-in zoom-in-95 my-auto">
-        <div className="flex justify-between items-center mb-5">
-          <h2 className="text-lg font-bold">Nova Tarefa Inteligente</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white p-1">
-            <X size={20} />
-          </button>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4 overflow-y-auto">
+      <div className="w-full max-w-lg rounded-t-3xl sm:rounded-3xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+        
+        {/* Header do Modal */}
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-bold text-zinc-100">{initialTask ? 'Editar Lembrete' : 'Adicionar Lembrete'}</h2>
+          <div className="flex items-center gap-2">
+            <button 
+              type="button" 
+              onClick={() => setIsImportant(!isImportant)} 
+              className={`p-2 rounded-xl transition-all ${isImportant ? 'bg-amber-500/20 text-amber-400' : 'bg-zinc-800 text-zinc-400'}`}
+              title="Marcar como Importante"
+            >
+              <Star size={18} fill={isImportant ? 'currentColor' : 'none'} />
+            </button>
+            <button onClick={onClose} className="text-zinc-400 hover:text-white p-2">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
-        <form onSubmit={handleCreate} className="space-y-4">
-          <input 
-            autoFocus
-            type="text"
-            className="w-full bg-zinc-800/80 border border-zinc-700/50 rounded-xl p-3.5 text-sm outline-none focus:border-indigo-500"
-            placeholder="O que precisa ser feito?"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
+        <form onSubmit={handleSave} className="space-y-4">
+          
+          {/* Input principal com botão de Voz embutido */}
+          <div className="relative">
+            <input 
+              autoFocus
+              type="text"
+              className="w-full bg-zinc-800/80 border border-zinc-700/50 rounded-2xl p-4 pr-12 text-sm outline-none focus:border-indigo-500 text-zinc-100 placeholder-zinc-500"
+              placeholder="O que precisa ser feito? (Ex: Renovar Receitas)"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+            <button 
+              type="button"
+              onClick={handleVoiceInput}
+              className={`absolute right-3 top-3.5 p-2 rounded-xl transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-zinc-400 hover:text-indigo-400'}`}
+              title="Adicionar por Voz"
+            >
+              <Mic size={18} />
+            </button>
+          </div>
 
-          <textarea 
-            className="w-full bg-zinc-800/80 border border-zinc-700/50 rounded-xl p-3 text-sm outline-none focus:border-indigo-500 resize-none h-16"
-            placeholder="Detalhes ou anotação (opcional)"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-
-          {/* Seleção de Pilares */}
+          {/* Categorias (Tiles estilo Samsung) */}
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5 block">Pilar</label>
-            <div className="flex gap-2">
-              {(['empresa', 'pessoal', 'saude'] as const).map((p) => (
+            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5 block">Categoria / Lista</label>
+            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+              {['saude', 'pessoal', 'vencimentos', 'lanchonete', 'pagamentos', 'estudos'].map((cat) => (
                 <button 
-                  key={p} 
+                  key={cat}
                   type="button"
-                  onClick={() => setPillar(p)} 
-                  className={`flex-1 py-2 text-xs rounded-xl capitalize font-medium transition-all ${
-                    pillar === p ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'bg-zinc-800 text-zinc-400'
+                  onClick={() => setCategory(cat)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize shrink-0 transition-all ${
+                    category === cat ? 'bg-indigo-600 text-white shadow-md' : 'bg-zinc-800 text-zinc-400 border border-zinc-700/50'
                   }`}
                 >
-                  {p}
+                  {cat}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Gatilhos de Lembrete Inteligente */}
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5 block">Gatilho de Alerta</label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setReminderType('none')}
-                className={`py-2 text-xs rounded-xl font-medium border transition-all ${reminderType === 'none' ? 'bg-zinc-700 border-zinc-500 text-white' : 'bg-zinc-800/50 border-zinc-800 text-zinc-400'}`}
+          {/* Checklist Interno (Subtarefas para remédios, listas, etc.) */}
+          <div className="p-3 bg-zinc-800/30 border border-zinc-800 rounded-2xl space-y-2">
+            <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+              <CheckSquare size={14} className="text-indigo-400" /> Itens de Checklist (Subtarefas)
+            </label>
+            <div className="space-y-1.5 max-h-32 overflow-y-auto">
+              {checklist.map((item, idx) => (
+                <div key={item.id} className="flex items-center justify-between bg-zinc-800/80 px-3 py-2 rounded-xl text-xs">
+                  <span className={item.completed ? 'line-through text-zinc-500' : 'text-zinc-200'}>{item.text}</span>
+                  <button 
+                    type="button" 
+                    onClick={() => setChecklist(checklist.filter((_, i) => i !== idx))}
+                    className="text-zinc-500 hover:text-red-400 text-xs font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <input 
+                type="text"
+                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-xs outline-none text-zinc-200"
+                placeholder="Adicionar item (ex: Mytedom 10mg)..."
+                value={newCheckText}
+                onChange={(e) => setNewCheckText(e.target.value)}
+              />
+              <button 
+                type="button" 
+                onClick={addChecklistItem}
+                className="bg-indigo-600 hover:bg-indigo-500 px-3 py-2 rounded-xl text-xs font-bold text-white"
               >
-                Padrão
-              </button>
-              <button
-                type="button"
-                onClick={() => setReminderType('time')}
-                className={`flex items-center justify-center gap-1.5 py-2 text-xs rounded-xl font-medium border transition-all ${reminderType === 'time' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300' : 'bg-zinc-800/50 border-zinc-800 text-zinc-400'}`}
-              >
-                <Clock size={14} /> Horário
-              </button>
-              <button
-                type="button"
-                onClick={() => setReminderType('location')}
-                className={`flex items-center justify-center gap-1.5 py-2 text-xs rounded-xl font-medium border transition-all ${reminderType === 'location' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300' : 'bg-zinc-800/50 border-zinc-800 text-zinc-400'}`}
-              >
-                <MapPin size={14} /> Local
+                Adicionar
               </button>
             </div>
           </div>
 
-          {/* Configuração de Horário */}
-          {reminderType === 'time' && (
-            <div className="p-3 bg-zinc-800/40 border border-zinc-800 rounded-2xl space-y-2 animate-in fade-in">
-              <label className="text-xs text-zinc-400 flex items-center gap-1 font-medium">
-                <Clock size={14} className="text-indigo-400" /> Selecionar Horário do Lembrete
-              </label>
+          {/* Configuração de Horário e Recorrência */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Horário</label>
               <input 
                 type="datetime-local"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-2.5 text-sm text-zinc-200 outline-none focus:border-indigo-500"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-2.5 text-xs text-zinc-200 outline-none"
                 value={reminderTime}
                 onChange={(e) => setReminderTime(e.target.value)}
               />
             </div>
-          )}
-
-          {/* Configuração de Localização e Raio em Metros */}
-          {reminderType === 'location' && (
-            <div className="p-3 bg-zinc-800/40 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
-              <label className="text-xs text-zinc-400 flex items-center gap-1 font-medium">
-                <MapPin size={14} className="text-indigo-400" /> Alerta por Proximidade (Geofencing)
-              </label>
-              <input 
-                type="text"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-2.5 text-sm text-zinc-200 outline-none focus:border-indigo-500"
-                placeholder="Ex: Trabalho, Casa, Hospital Sarah..."
-                value={locationName}
-                onChange={(e) => setLocationName(e.target.value)}
-              />
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-zinc-400">
-                  <span>Raio de proximidade:</span>
-                  <strong className="text-indigo-400 font-bold">{radiusMeters} metros</strong>
-                </div>
-                <input 
-                  type="range"
-                  min="50"
-                  max="1000"
-                  step="50"
-                  value={radiusMeters}
-                  onChange={(e) => setRadiusMeters(Number(e.target.value))}
-                  className="w-full accent-indigo-500 bg-zinc-800 cursor-pointer"
-                />
-                <span className="text-[10px] text-zinc-500 block">O app vai disparar a notificação quando você estiver a essa distância do ponto.</span>
-              </div>
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Recorrência</label>
+              <select
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-2.5 text-xs text-zinc-200 outline-none capitalize"
+                value={recurrence}
+                onChange={(e) => setRecurrence(e.target.value)}
+              >
+                <option value="none">Não repetir</option>
+                <option value="daily">Diariamente</option>
+                <option value="weekly">Semanalmente</option>
+                <option value="monthly">Mensalmente</option>
+              </select>
             </div>
-          )}
+          </div>
 
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-sm tracking-wide shadow-lg shadow-indigo-600/20 active:scale-[0.98] transition-all disabled:opacity-50 mt-4"
+            className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-sm tracking-wide shadow-lg shadow-indigo-600/20 active:scale-95 transition-all disabled:opacity-50 mt-3"
           >
-            {loading ? 'Salvando...' : 'Criar Tarefa'}
+            {loading ? 'Salvando...' : (initialTask ? 'Salvar Alterações' : 'Criar Lembrete')}
           </button>
         </form>
       </div>
