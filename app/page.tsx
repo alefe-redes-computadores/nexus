@@ -11,7 +11,7 @@ import TaskModal from '../components/TaskModal';
 import TaskCard from '../components/TaskCard';
 import ActivityClock from '../components/ActivityClock';
 import FocusModeModal from '../components/FocusModeModal';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Search, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Epicentro() {
@@ -19,8 +19,10 @@ export default function Epicentro() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFocusOpen, setIsFocusOpen] = useState(false);
-  const [isClockVisible, setIsClockVisible] = useState(true); // Permite ocultar o painel de foco
+  const [isClockVisible, setIsClockVisible] = useState(true);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -36,32 +38,51 @@ export default function Epicentro() {
   }, []);
 
   async function loadTasks() {
-    // Carrega apenas as tarefas pendentes na home principal
     const localTasks = await db.tasks.where('status').equals('pending').toArray();
     setTasks(localTasks);
   }
 
-  // Otimização de Performance com useMemo
-  const filteredTasks = useMemo(() => {
-    return tasks.sort((a, b) => {
-      if (a.is_important && !b.is_important) return -1;
-      return 0;
+  // Agrupamento Inteligente por Prazos e Filtro de Pesquisa
+  const categorizedTasks = useMemo(() => {
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+
+    const filtered = tasks.filter(t => 
+      t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.category.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const past: Task[] = [];
+    const today: Task[] = [];
+    const upcoming: Task[] = [];
+
+    filtered.forEach(t => {
+      if (!t.reminder_time) {
+        upcoming.push(t);
+        return;
+      }
+      const taskDateStr = t.reminder_time.slice(0, 10);
+      if (taskDateStr < todayStr) {
+        past.push(t);
+      } else if (taskDateStr === todayStr) {
+        today.push(t);
+      } else {
+        upcoming.push(t);
+      }
     });
-  }, [tasks]);
+
+    return { past, today, upcoming };
+  }, [tasks, searchQuery]);
 
   async function handleCompleteTask(id: string) {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
     
     const newStatus = 'archived';
-    
-    // Atualiza local e nuvem
     await db.tasks.update(id, { status: newStatus });
     await supabase.from('tasks').update({ status: newStatus }).eq('id', id);
 
-    // Processa a Recorrência Inteligente (Gera a próxima ocorrência automaticamente se houver)
     await processRecurrence(task);
-
     loadTasks();
   }
 
@@ -77,12 +98,13 @@ export default function Epicentro() {
   }
 
   const priorityTask = tasks.find(t => t.status === 'pending');
+  const totalActive = tasks.length;
 
   return (
     <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100 font-sans">
       <Header />
       
-      {/* Widget de Atividades / Zona de Foco Colapsável com Padrão de Elite */}
+      {/* Widget de Atividades / Zona de Foco Colapsável */}
       <div className="px-6 mt-4">
         {isClockVisible ? (
           <div className="relative bg-zinc-900/40 border border-zinc-800/80 rounded-3xl p-1 backdrop-blur-xl shadow-xl transition-all">
@@ -106,18 +128,49 @@ export default function Epicentro() {
         )}
       </div>
 
-      {/* Título de Seção Limpo */}
+      {/* Barra de Título e Pesquisa Rápida */}
       <div className="px-6 mt-6 mb-4 flex items-center justify-between">
         <h2 className="text-xs font-bold tracking-widest uppercase text-zinc-500">
-          Atividades Ativas ({filteredTasks.length})
+          Atividades Ativas ({totalActive})
         </h2>
-        <div className="w-8 h-[2px] bg-zinc-900 rounded-full" />
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setIsSearchOpen(!isSearchOpen)}
+            className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-indigo-400 transition-all"
+            title="Pesquisar Tarefas"
+          >
+            <Search size={14} />
+          </button>
+          <div className="w-8 h-[2px] bg-zinc-900 rounded-full" />
+        </div>
       </div>
 
-      {/* Lista de Tarefas Otimizada */}
-      <div className="px-6 space-y-3">
+      {/* Input de Pesquisa Expansível */}
+      {isSearchOpen && (
+        <div className="px-6 mb-4 animate-in fade-in">
+          <div className="relative flex items-center bg-zinc-900 border border-zinc-800 rounded-2xl px-3 py-2">
+            <Search size={14} className="text-zinc-500 mr-2" />
+            <input 
+              autoFocus
+              type="text"
+              placeholder="Pesquisar lembrete por nome ou categoria..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-transparent text-xs text-zinc-100 outline-none placeholder-zinc-500"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="text-zinc-500 hover:text-white">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Lista Dividida por Prazos (Passado, Hoje, Próximos) */}
+      <div className="px-6 space-y-6">
         <AnimatePresence>
-          {filteredTasks.length === 0 ? (
+          {totalActive === 0 ? (
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               className="text-center py-20 border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/10"
@@ -126,15 +179,58 @@ export default function Epicentro() {
               <p className="text-zinc-500 text-xs font-medium uppercase tracking-widest">Painel limpo</p>
             </motion.div>
           ) : (
-            filteredTasks.map(task => (
-              <TaskCard 
-                key={task.id} 
-                task={task} 
-                onComplete={handleCompleteTask} 
-                onEdit={(t: Task) => { setEditingTask(t); setIsModalOpen(true); }} 
-                onToggleCheck={handleToggleCheck}
-              />
-            ))
+            <>
+              {/* SEÇÃO PASSADO / ATRASADO (Destaque Bordô/Vermelho) */}
+              {categorizedTasks.past.length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-red-400">Passado / Atrasados</span>
+                  {categorizedTasks.past.map(task => (
+                    <TaskCard 
+                      key={task.id} 
+                      task={task} 
+                      sectionType="past"
+                      onComplete={handleCompleteTask} 
+                      onEdit={(t: Task) => { setEditingTask(t); setIsModalOpen(true); }} 
+                      onToggleCheck={handleToggleCheck}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* SEÇÃO HOJE (Destaque Amarelo Mostarda) */}
+              {categorizedTasks.today.length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Hoje</span>
+                  {categorizedTasks.today.map(task => (
+                    <TaskCard 
+                      key={task.id} 
+                      task={task} 
+                      sectionType="today"
+                      onComplete={handleCompleteTask} 
+                      onEdit={(t: Task) => { setEditingTask(t); setIsModalOpen(true); }} 
+                      onToggleCheck={handleToggleCheck}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* SEÇÃO PRÓXIMOS / FUTURO */}
+              {categorizedTasks.upcoming.length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Próximos dias</span>
+                  {categorizedTasks.upcoming.map(task => (
+                    <TaskCard 
+                      key={task.id} 
+                      task={task} 
+                      sectionType="upcoming"
+                      onComplete={handleCompleteTask} 
+                      onEdit={(t: Task) => { setEditingTask(t); setIsModalOpen(true); }} 
+                      onToggleCheck={handleToggleCheck}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </AnimatePresence>
       </div>
