@@ -10,7 +10,7 @@ import TaskModal from '../components/TaskModal';
 import TaskCard from '../components/TaskCard';
 import ActivityClock from '../components/ActivityClock';
 import FocusModeModal from '../components/FocusModeModal';
-import { Archive, ListTodo, CheckCircle2 } from 'lucide-react';
+import { Archive, ListTodo, CheckCircle2, Heart, Briefcase, User, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Epicentro() {
@@ -75,6 +75,28 @@ export default function Epicentro() {
       
       {/* Widget Interativo de Atividades / Zona de Foco */}
       <ActivityClock tasks={tasks} onOpenFocus={() => setIsFocusOpen(true)} />
+
+      {/* Atalhos Rápidos (Smart Pills) com Ícones Nativos */}
+      <div className="px-6 mb-4 flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+        {[
+          { name: 'Saúde', icon: Heart },
+          { name: 'Trabalho', icon: Briefcase },
+          { name: 'Pessoal', icon: User },
+          { name: 'Estudos', icon: BookOpen }
+        ].map((pill) => (
+          <button 
+            key={pill.name}
+            onClick={() => {
+              setView('pending');
+              setEditingTask({ title: '', category: pill.name, status: 'pending' } as any);
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-2xl text-xs font-bold text-zinc-300 hover:bg-zinc-800 transition-all shrink-0 active:scale-95"
+          >
+            <pill.icon size={14} className="text-indigo-400" /> {pill.name}
+          </button>
+        ))}
+      </div>
 
       {/* Painel de Comando (Navegação) */}
       <div className="px-6 mb-6">
