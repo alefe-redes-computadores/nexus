@@ -7,9 +7,9 @@ import Header from '../components/Header';
 import QuickInputBar from '../components/QuickInputBar';
 import TaskModal from '../components/TaskModal';
 import TaskCard from '../components/TaskCard';
-import { CheckCircle2, Archive, ListTodo } from 'lucide-react';
+import { Calendar, Archive, CheckCircle2, ListTodo } from 'lucide-react';
 
-export default function Home() {
+export default function Epicentro() {
   const [user, setUser] = useState<any>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [view, setView] = useState<'pending' | 'archived'>('pending');
@@ -20,10 +20,9 @@ export default function Home() {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user));
     loadTasks();
     startGeofenceWatcher();
-  }, [view]); // Recarrega sempre que mudar entre Pendente/Arquivado
+  }, [view]);
 
   async function loadTasks() {
-    // Busca do banco local com base no filtro da aba
     const localTasks = await db.tasks.where('status').equals(view).toArray();
     setTasks(localTasks);
   }
@@ -50,7 +49,7 @@ export default function Home() {
     <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100 font-sans">
       <Header />
       
-      {/* Abas de Navegação (Substitui menu inferior) */}
+      {/* Abas de Navegação Minimalistas */}
       <div className="px-6 mt-4 mb-6">
         <div className="flex bg-zinc-900/50 p-1 rounded-2xl border border-zinc-800">
           <button 
@@ -88,7 +87,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* Input Flutuante Estilo Samsung */}
+      {/* Input Fixado no Rodapé (Estilo Samsung) */}
       <QuickInputBar onClick={() => { setEditingTask(null); setIsModalOpen(true); }} />
 
       <TaskModal 
