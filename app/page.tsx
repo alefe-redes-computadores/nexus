@@ -8,8 +8,9 @@ import Header from '../components/Header';
 import QuickInputBar from '../components/QuickInputBar';
 import TaskModal from '../components/TaskModal';
 import TaskCard from '../components/TaskCard';
-import { LayoutGrid, Flame, Archive, Zap, ShieldCheck } from 'lucide-react';
-import { motion } from 'framer-motion';
+import ActivityClock from '../components/ActivityClock';
+import { Archive, ListTodo, CheckCircle2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Epicentro() {
   const [user, setUser] = useState<any>(null);
@@ -36,69 +37,76 @@ export default function Epicentro() {
     setTasks(localTasks);
   }
 
+  async function handleCompleteTask(id: string) {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    const newStatus = view === 'pending' ? 'archived' : 'pending';
+    await db.tasks.update(id, { status: newStatus });
+    await supabase.from('tasks').update({ status: newStatus }).eq('id', id);
+    loadTasks();
+  }
+
+  async function handleToggleCheck(taskId: string, checkId: string) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || !task.checklist) return;
+    const updatedChecklist = task.checklist.map(item => 
+      item.id === checkId ? { ...item, completed: !item.completed } : item
+    );
+    await db.tasks.update(taskId, { checklist: updatedChecklist });
+    await supabase.from('tasks').update({ checklist: updatedChecklist }).eq('id', taskId);
+    loadTasks();
+  }
+
   return (
     <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100 font-sans">
       <Header />
       
-      {/* Painel de Comando - Substitui abas chatas */}
-      <div className="px-6 mt-6">
-        <div className="grid grid-cols-2 gap-3 mb-6">
+      {/* Widget de Relógio de Atividades (Identidade Única) */}
+      <ActivityClock tasks={tasks} />
+
+      {/* Painel de Comando (Navegação) */}
+      <div className="px-6 mb-6">
+        <div className="flex bg-zinc-900/50 p-1 rounded-2xl border border-zinc-800 backdrop-blur-sm">
           <button 
             onClick={() => setView('pending')}
-            className={`relative overflow-hidden p-4 rounded-3xl border transition-all ${view === 'pending' ? 'bg-indigo-950/30 border-indigo-500/50' : 'bg-zinc-900 border-zinc-800'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold transition-all ${view === 'pending' ? 'bg-indigo-600 text-white shadow-lg' : 'text-zinc-500'}`}
           >
-            <div className="flex flex-col gap-1 text-left">
-              <Zap size={18} className={view === 'pending' ? 'text-indigo-400' : 'text-zinc-500'} />
-              <span className="text-xs font-bold text-zinc-300">Pendentes</span>
-            </div>
+            <ListTodo size={16} /> Pendentes
           </button>
           <button 
             onClick={() => setView('archived')}
-            className={`relative overflow-hidden p-4 rounded-3xl border transition-all ${view === 'archived' ? 'bg-emerald-950/30 border-emerald-500/50' : 'bg-zinc-900 border-zinc-800'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold transition-all ${view === 'archived' ? 'bg-emerald-600 text-white shadow-lg' : 'text-zinc-500'}`}
           >
-            <div className="flex flex-col gap-1 text-left">
-              <ShieldCheck size={18} className={view === 'archived' ? 'text-emerald-400' : 'text-zinc-500'} />
-              <span className="text-xs font-bold text-zinc-300">Arquivados</span>
-            </div>
+            <Archive size={16} /> Arquivados
           </button>
         </div>
-
-        {/* Header do Painel */}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold tracking-tight text-zinc-400 flex items-center gap-2">
-            <LayoutGrid size={14} /> Atividades {view === 'pending' ? 'Ativas' : 'Concluídas'}
-          </h2>
-          <div className="w-8 h-[2px] bg-zinc-800 rounded-full" />
-        </div>
       </div>
 
-      {/* Lista de Tarefas - Estilo Grid otimizado */}
+      {/* Lista de Tarefas (Cards Inteligentes) */}
       <div className="px-6 space-y-3">
-        {tasks.length === 0 ? (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="text-center py-16 border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/10"
-          >
-            <p className="text-zinc-600 text-xs font-bold uppercase tracking-widest">Painel Limpo</p>
-          </motion.div>
-        ) : (
-          tasks.map(task => (
-            <TaskCard 
-              key={task.id} 
-              task={task} 
-              onComplete={async (id: string) => { 
-                const newStatus = view === 'pending' ? 'archived' : 'pending';
-                await db.tasks.update(id, { status: newStatus });
-                await supabase.from('tasks').update({ status: newStatus }).eq('id', id);
-                loadTasks();
-              }} 
-              onEdit={(t: Task) => { setEditingTask(t); setIsModalOpen(true); }} 
-            />
-          ))
-        )}
+        <AnimatePresence>
+          {tasks.length === 0 ? (
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="text-center py-20 border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/10"
+            >
+              <CheckCircle2 size={36} className="mx-auto text-zinc-700 mb-2" />
+              <p className="text-zinc-500 text-xs font-medium uppercase tracking-widest">Painel limpo</p>
+            </motion.div>
+          ) : (
+            tasks.map(task => (
+              <TaskCard 
+                key={task.id} 
+                task={task} 
+                onComplete={handleCompleteTask} 
+                onEdit={(t: Task) => { setEditingTask(t); setIsModalOpen(true); }} 
+                onToggleCheck={handleToggleCheck}
+              />
+            ))
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Input Flutuante no Rodapé */}
       <QuickInputBar onClick={() => { setEditingTask(null); setIsModalOpen(true); }} />
 
       <TaskModal 
