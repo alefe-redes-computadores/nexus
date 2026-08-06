@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { X, Mic, CheckSquare, Star, Clock, MapPin, Plus, Heart, User, FileText, Coffee, Briefcase, Bookmark } from 'lucide-react';
+import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Plus, Heart, User, Briefcase, FileText, Coffee, Bookmark, Navigation } from 'lucide-react';
 import { db, Task, CheckItem, Category } from '../lib/db';
 import { supabase } from '../lib/supabase';
 
@@ -18,7 +18,7 @@ const AVAILABLE_ICONS = [
   { name: 'Trabalho', icon: Briefcase },
   { name: 'Documentos', icon: FileText },
   { name: 'Alimentação', icon: Coffee },
-  { name: 'Geral', icon: Bookmark }
+  { name: 'Geral', icon: Bookmark },
 ];
 
 export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, initialTask }: TaskModalProps) {
@@ -31,8 +31,12 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   const [reminderType, setReminderType] = useState<'none' | 'time' | 'location'>(initialTask?.reminder_type || 'none');
   const [reminderTime, setReminderTime] = useState(initialTask?.reminder_time || '');
   const [recurrence, setRecurrence] = useState<any>(initialTask?.recurrence || 'none');
+  
   const [locationName, setLocationName] = useState(initialTask?.location_name || '');
+  const [lat, setLat] = useState<number | undefined>(initialTask?.lat);
+  const [lng, setLng] = useState<number | undefined>(initialTask?.lng);
   const [radiusMeters, setRadiusMeters] = useState(initialTask?.radius_meters || 100);
+  const [loadingGps, setLoadingGps] = useState(false);
 
   const [categoriesList, setCategoriesList] = useState<Category[]>([]);
   const [showNewCatInput, setShowNewCatInput] = useState(false);
@@ -71,6 +75,39 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     setCategory(newCatName.trim());
   }
 
+  function handleCaptureGpsLocation() {
+    if (!navigator.geolocation) {
+      alert('Seu dispositivo não suporta geolocalização.');
+      return;
+    }
+
+    setLoadingGps(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const currentLat = position.coords.latitude;
+        const currentLng = position.coords.longitude;
+        setLat(currentLat);
+        setLng(currentLng);
+
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentLat}&lon=${currentLng}`);
+          const data = await res.json();
+          const address = data.display_name ? data.display_name.split(',')[0] : `Lat: ${currentLat.toFixed(4)}, Lng: ${currentLng.toFixed(4)}`;
+          setLocationName(address);
+        } catch {
+          setLocationName(`GPS (${currentLat.toFixed(4)}, ${currentLng.toFixed(4)})`);
+        } finally {
+          setLoadingGps(false);
+        }
+      },
+      (error) => {
+        alert('Erro ao obter GPS: ' + error.message);
+        setLoadingGps(false);
+      },
+      { enableHighAccuracy: true }
+    );
+  }
+
   if (!isOpen) return null;
 
   function handleVoiceInput() {
@@ -97,6 +134,10 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     setNewCheckText('');
   }
 
+  function toggleCheckItem(id: string) {
+    setChecklist(checklist.map(item => item.id === id ? { ...item, completed: !item.completed } : item));
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
@@ -113,6 +154,8 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
       reminder_type: reminderType,
       reminder_time: reminderType === 'time' ? reminderTime : undefined,
       location_name: reminderType === 'location' ? locationName : undefined,
+      lat: reminderType === 'location' ? lat : undefined,
+      lng: reminderType === 'location' ? lng : undefined,
       radius_meters: reminderType === 'location' ? radiusMeters : undefined,
     };
 
@@ -162,7 +205,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               autoFocus
               type="text"
               className="w-full bg-zinc-950/60 border border-zinc-800 rounded-2xl p-4 pr-12 text-sm outline-none focus:border-indigo-500 text-zinc-100 placeholder-zinc-500 transition-all shadow-inner"
-              placeholder="O que precisa ser feito?"
+              placeholder="O que precisa ser feito? (Ex: Renovar Receitas)"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -291,16 +334,28 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
           {reminderType === 'location' && (
             <div className="p-3.5 bg-zinc-950/40 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
               <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                <MapPin size={14} className="text-indigo-400" /> Alerta por Localização (Geofencing)
+                <MapPin size={14} className="text-indigo-400" /> Alerta por GPS (Geofencing)
               </label>
-              <input 
-                type="text"
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 outline-none focus:border-indigo-500"
-                placeholder="Nome do local (Ex: Trabalho, Farmácia...)"
-                value={locationName}
-                onChange={(e) => setLocationName(e.target.value)}
-              />
-              <div className="space-y-1">
+              
+              <div className="flex items-center gap-2">
+                <input 
+                  type="text"
+                  readOnly
+                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 outline-none"
+                  placeholder="Nenhum local selecionado..."
+                  value={locationName}
+                />
+                <button
+                  type="button"
+                  onClick={handleCaptureGpsLocation}
+                  disabled={loadingGps}
+                  className="px-3 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold text-white flex items-center gap-1 shrink-0 active:scale-95 transition-all"
+                >
+                  <Navigation size={14} className={loadingGps ? 'animate-spin' : ''} /> {loadingGps ? 'Buscando...' : 'Marcar Local Atual'}
+                </button>
+              </div>
+
+              <div className="space-y-1 pt-1">
                 <div className="flex justify-between text-xs text-zinc-400">
                   <span>Raio de proximidade:</span>
                   <strong className="text-indigo-400 font-bold">{radiusMeters} metros</strong>
@@ -318,17 +373,34 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
             </div>
           )}
 
+          {/* Checklist com Checkboxes Interativos */}
           <div className="p-3.5 bg-zinc-950/40 border border-zinc-800/80 rounded-2xl space-y-2.5">
             <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
               <CheckSquare size={14} className="text-indigo-400" /> Checklist (Subtarefas)
             </label>
-            <div className="space-y-1.5 max-h-28 overflow-y-auto">
-              {checklist.map((item, idx) => (
-                <div key={item.id} className="flex items-center justify-between bg-zinc-900 px-3 py-2 rounded-xl text-xs border border-zinc-800">
-                  <span className="text-zinc-200">{item.text}</span>
+            <div className="space-y-1.5 max-h-32 overflow-y-auto">
+              {checklist.map((item) => (
+                <div 
+                  key={item.id} 
+                  onClick={() => toggleCheckItem(item.id)}
+                  className="flex items-center justify-between bg-zinc-900 px-3 py-2 rounded-xl text-xs border border-zinc-800 cursor-pointer hover:border-zinc-700 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    {item.completed ? (
+                      <CheckSquare size={15} className="text-indigo-400 shrink-0" />
+                    ) : (
+                      <Square size={15} className="text-zinc-600 shrink-0" />
+                    )}
+                    <span className={item.completed ? 'line-through text-zinc-500' : 'text-zinc-200'}>
+                      {item.text}
+                    </span>
+                  </div>
                   <button 
                     type="button" 
-                    onClick={() => setChecklist(checklist.filter((_, i) => i !== idx))}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setChecklist(checklist.filter(i => i.id !== item.id));
+                    }}
                     className="text-zinc-500 hover:text-red-400 font-bold px-1"
                   >
                     ✕
@@ -340,7 +412,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               <input 
                 type="text"
                 className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none text-zinc-200 placeholder-zinc-600"
-                placeholder="Adicionar item..."
+                placeholder="Adicionar item (Ex: Mytedom 10mg)..."
                 value={newCheckText}
                 onChange={(e) => setNewCheckText(e.target.value)}
               />
