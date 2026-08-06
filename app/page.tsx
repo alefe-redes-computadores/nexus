@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { db } from '../lib/db'; // Importando o Dexie
 import Header from '../components/Header';
 import Navbar from '../components/Navbar';
 
@@ -10,18 +11,28 @@ export default function Epicentro() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
-    loadTasks();
+    syncAndLoad();
   }, []);
 
-  async function loadTasks() {
-    const { data } = await supabase.from('tasks').select('*').eq('status', 'pending');
-    setTasks(data || []);
+  async function syncAndLoad() {
+    // 1. Carrega o que está local (Instantâneo!)
+    const localTasks = await db.tasks.toArray();
+    setTasks(localTasks);
+
+    // 2. Busca no Supabase em background
+    const { data: remoteTasks } = await supabase.from('tasks').select('*').eq('status', 'pending');
+    
+    if (remoteTasks) {
+      // 3. Atualiza o banco local com os dados da nuvem
+      await db.tasks.clear();
+      await db.tasks.bulkAdd(remoteTasks);
+      setTasks(remoteTasks);
+    }
   }
 
   return (
     <main className="min-h-screen bg-zinc-950 pb-24 text-zinc-100">
       <Header user={user} />
-      
       <div className="px-6 space-y-4">
         {tasks.map(task => (
           <div key={task.id} className="p-4 rounded-2xl border border-zinc-800 bg-zinc-900/50">
@@ -30,8 +41,7 @@ export default function Epicentro() {
           </div>
         ))}
       </div>
-
-      <Navbar onAddTask={() => alert('Abrir modal de criação')} />
+      <Navbar onAddTask={() => {}} />
     </main>
   );
 }
