@@ -22,6 +22,7 @@ export interface Task {
   status: 'pending' | 'completed' | 'archived';
   is_important?: boolean;
   checklist?: CheckItem[];
+  tags?: string[]; // NOVO: Propriedade de tags dinâmicas
   recurrence?: 'none' | 'daily' | 'weekly' | 'monthly';
   reminder_type?: 'none' | 'time' | 'location';
   reminder_time?: string;
