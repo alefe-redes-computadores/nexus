@@ -2,11 +2,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { db, Task } from '../lib/db';
+import { startGeofenceWatcher } from '../lib/notifications';
 import Header from '../components/Header';
 import Navbar from '../components/Navbar';
 import TaskModal from '../components/TaskModal';
 import TaskCard from '../components/TaskCard';
-import { Calendar, Star, Heart, User, Briefcase, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Calendar, Star, CheckCircle2, Bookmark } from 'lucide-react';
 
 export default function Epicentro() {
   const [user, setUser] = useState<any>(null);
@@ -18,6 +19,9 @@ export default function Epicentro() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
     loadLocalAndSync();
+
+    // Inicia o motor de rastreamento de geolocalização e notificações em background
+    startGeofenceWatcher();
   }, []);
 
   async function loadLocalAndSync() {
@@ -42,7 +46,6 @@ export default function Epicentro() {
     }
   }
 
-  // Filtragem baseada nos tiles da Samsung
   const filteredTasks = tasks.filter(task => {
     if (activeFilter === 'all') return true;
     if (activeFilter === 'important') return task.is_important;
@@ -50,83 +53,57 @@ export default function Epicentro() {
   });
 
   return (
-    <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100 font-sans selection:bg-indigo-500">
+    <main className="min-h-screen bg-zinc-950 pb-32 text-zinc-100 font-sans">
       <Header user={user} />
       
-      {/* Dashboard Tiles (Estilo Samsung Reminder) */}
-      <div className="px-6 mb-6">
-        <div className="grid grid-cols-3 gap-2.5">
-          
-          {/* Tile: Todos / Hoje */}
+      {/* Dashboard Tiles */}
+      <div className="px-6 mb-6 pt-2">
+        <div className="grid grid-cols-2 gap-3 mb-3">
           <button 
             onClick={() => setActiveFilter('all')}
-            className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between h-24 ${activeFilter === 'all' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200' : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-300 hover:border-zinc-700'}`}
+            className={`p-4 rounded-3xl border text-left transition-all flex flex-col justify-between h-28 ${activeFilter === 'all' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200 shadow-lg shadow-indigo-600/10' : 'bg-zinc-900/40 border-zinc-800/80 text-zinc-300'}`}
           >
             <div className="flex justify-between items-center w-full">
-              <Calendar size={18} className="text-indigo-400" />
-              <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-zinc-800/80">{tasks.length}</span>
+              <Calendar size={20} className="text-indigo-400" />
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-zinc-800">{tasks.length}</span>
             </div>
-            <span className="text-xs font-semibold tracking-wide">Geral</span>
+            <div>
+              <span className="text-sm font-bold block">Todos</span>
+              <span className="text-[10px] text-zinc-500">Geral</span>
+            </div>
           </button>
 
-          {/* Tile: Importantes */}
           <button 
             onClick={() => setActiveFilter('important')}
-            className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between h-24 ${activeFilter === 'important' ? 'bg-amber-500/20 border-amber-500 text-amber-200' : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-300 hover:border-zinc-700'}`}
+            className={`p-4 rounded-3xl border text-left transition-all flex flex-col justify-between h-28 ${activeFilter === 'important' ? 'bg-amber-500/20 border-amber-500 text-amber-200 shadow-lg shadow-amber-500/10' : 'bg-zinc-900/40 border-zinc-800/80 text-zinc-300'}`}
           >
             <div className="flex justify-between items-center w-full">
-              <Star size={18} className="text-amber-400" />
-              <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-zinc-800/80">{tasks.filter(t => t.is_important).length}</span>
+              <Star size={20} className="text-amber-400" />
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-zinc-800">{tasks.filter(t => t.is_important).length}</span>
             </div>
-            <span className="text-xs font-semibold tracking-wide">Importantes</span>
-          </button>
-
-          {/* Tile: Saúde */}
-          <button 
-            onClick={() => setActiveFilter('saude')}
-            className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between h-24 ${activeFilter === 'saude' ? 'bg-rose-500/20 border-rose-500 text-rose-200' : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-300 hover:border-zinc-700'}`}
-          >
-            <div className="flex justify-between items-center w-full">
-              <Heart size={18} className="text-rose-400" />
-              <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-zinc-800/80">{tasks.filter(t => t.category === 'saude').length}</span>
+            <div>
+              <span className="text-sm font-bold block">Importantes</span>
+              <span className="text-[10px] text-zinc-500">Destaques</span>
             </div>
-            <span className="text-xs font-semibold tracking-wide">Saúde</span>
           </button>
-
-        </div>
-
-        {/* Linha secundária de categorias rápidas */}
-        <div className="flex gap-2 mt-2.5 overflow-x-auto no-scrollbar">
-          {['pessoal', 'vencimentos', 'lanchonete', 'pagamentos', 'estudos'].map((cat) => {
-            const count = tasks.filter(t => t.category === cat).length;
-            return (
-              <button
-                key={cat}
-                onClick={() => setActiveFilter(cat)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium capitalize shrink-0 border transition-all ${activeFilter === cat ? 'bg-zinc-200 text-zinc-950 border-white font-bold' : 'bg-zinc-900/40 text-zinc-400 border-zinc-800'}`}
-              >
-                {cat} ({count})
-              </button>
-            );
-          })}
         </div>
       </div>
 
-      {/* Lista de Tarefas Estilizada */}
+      {/* Lista de Lembretes */}
       <div className="px-6 space-y-3">
-        <div className="flex justify-between items-center mb-1">
+        <div className="flex justify-between items-center mb-1 px-1">
           <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-            {activeFilter === 'all' ? 'Todas as Tarefas' : `Filtro: ${activeFilter}`}
+            {activeFilter === 'all' ? 'Lembretes Pendentes' : `Filtro: ${activeFilter}`}
           </h3>
           {activeFilter !== 'all' && (
-            <button onClick={() => setActiveFilter('all')} className="text-xs text-indigo-400 font-semibold">Limpar Filtro</button>
+            <button onClick={() => setActiveFilter('all')} className="text-xs text-indigo-400 font-semibold">Ver Todos</button>
           )}
         </div>
 
         {filteredTasks.length === 0 ? (
-          <div className="text-center py-16 border border-dashed border-zinc-800/80 rounded-3xl bg-zinc-900/20">
-            <CheckCircle2 size={32} className="mx-auto text-zinc-700 mb-2" />
-            <p className="text-zinc-500 text-sm">Nenhum lembrete encontrado aqui.</p>
+          <div className="text-center py-20 border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20">
+            <CheckCircle2 size={36} className="mx-auto text-zinc-700 mb-2" />
+            <p className="text-zinc-500 text-sm font-medium">Nenhum lembrete por aqui.</p>
           </div>
         ) : (
           filteredTasks.map(task => (
