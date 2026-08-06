@@ -1,10 +1,10 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { db, Task } from '../lib/db';
 import { initAutoSync } from '../lib/sync';
 import { startGeofenceWatcher } from '../lib/notifications';
-import { processRecurrence } from '../lib/recurrence';
+import { useTasks } from '../hooks/useTasks';
 import Header from '../components/Header';
 import QuickInputBar from '../components/QuickInputBar';
 import TaskModal from '../components/TaskModal';
@@ -16,13 +16,22 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Epicentro() {
   const [user, setUser] = useState<any>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFocusOpen, setIsFocusOpen] = useState(false);
   const [isClockVisible, setIsClockVisible] = useState(true);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  const {
+    tasks,
+    categorizedTasks,
+    searchQuery,
+    setSearchQuery,
+    isSearchOpen,
+    setIsSearchOpen,
+    handleCompleteTask,
+    handleToggleCheck,
+    loadTasks
+  } = useTasks(user?.id);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -33,69 +42,8 @@ export default function Epicentro() {
         return () => cleanup?.();
       }
     });
-    loadTasks();
     startGeofenceWatcher();
   }, []);
-
-  async function loadTasks() {
-    const localTasks = await db.tasks.where('status').equals('pending').toArray();
-    setTasks(localTasks);
-  }
-
-  // Agrupamento Inteligente por Prazos e Filtro de Pesquisa
-  const categorizedTasks = useMemo(() => {
-    const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
-
-    const filtered = tasks.filter(t => 
-      t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.category.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    const past: Task[] = [];
-    const today: Task[] = [];
-    const upcoming: Task[] = [];
-
-    filtered.forEach(t => {
-      if (!t.reminder_time) {
-        upcoming.push(t);
-        return;
-      }
-      const taskDateStr = t.reminder_time.slice(0, 10);
-      if (taskDateStr < todayStr) {
-        past.push(t);
-      } else if (taskDateStr === todayStr) {
-        today.push(t);
-      } else {
-        upcoming.push(t);
-      }
-    });
-
-    return { past, today, upcoming };
-  }, [tasks, searchQuery]);
-
-  async function handleCompleteTask(id: string) {
-    const task = tasks.find(t => t.id === id);
-    if (!task) return;
-    
-    const newStatus = 'archived';
-    await db.tasks.update(id, { status: newStatus });
-    await supabase.from('tasks').update({ status: newStatus }).eq('id', id);
-
-    await processRecurrence(task);
-    loadTasks();
-  }
-
-  async function handleToggleCheck(taskId: string, checkId: string) {
-    const task = tasks.find(t => t.id === taskId);
-    if (!task || !task.checklist) return;
-    const updatedChecklist = task.checklist.map(item => 
-      item.id === checkId ? { ...item, completed: !item.completed } : item
-    );
-    await db.tasks.update(taskId, { checklist: updatedChecklist });
-    await supabase.from('tasks').update({ checklist: updatedChecklist }).eq('id', taskId);
-    loadTasks();
-  }
 
   const priorityTask = tasks.find(t => t.status === 'pending');
   const totalActive = tasks.length;
@@ -180,7 +128,7 @@ export default function Epicentro() {
             </motion.div>
           ) : (
             <>
-              {/* SEÇÃO PASSADO / ATRASADO (Destaque Bordô/Vermelho) */}
+              {/* SEÇÃO PASSADO / ATRASADO */}
               {categorizedTasks.past.length > 0 && (
                 <div className="space-y-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-red-400">Passado / Atrasados</span>
@@ -197,7 +145,7 @@ export default function Epicentro() {
                 </div>
               )}
 
-              {/* SEÇÃO HOJE (Destaque Amarelo Mostarda) */}
+              {/* SEÇÃO HOJE */}
               {categorizedTasks.today.length > 0 && (
                 <div className="space-y-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Hoje</span>
