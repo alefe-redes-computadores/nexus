@@ -36,19 +36,9 @@ export default function Header() {
     router.push('/');
   }
 
-  // Captura abrangente de todas as propriedades possíveis de foto do Google/Supabase
-  const meta = user?.user_metadata || {};
-  const identity = user?.identities?.[0]?.identity_data || {};
-
-  const avatar = 
-    meta.avatar_url || 
-    meta.picture || 
-    identity.avatar_url || 
-    identity.picture ||
-    user?.raw_user_meta_data?.avatar_url ||
-    user?.raw_user_meta_data?.picture;
-
-  const fullName = meta.full_name || identity.full_name || 'Álefe';
+  // Revertido para o padrão simples e direto que o Supabase usa e que funcionava antes
+  const avatar = user?.user_metadata?.avatar_url;
+  const fullName = user?.user_metadata?.full_name || 'Álefe';
   const name = fullName.split(' ')[0];
 
   return (
@@ -58,7 +48,6 @@ export default function Header() {
           <h1 className="text-xl font-bold tracking-tight text-zinc-100">
             Olá, {name}
           </h1>
-          {/* LED de Radar (Indica Geofencing e GPS Ativo) */}
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800">
             <div className="relative flex h-2 w-2">
               {isTracking && (
@@ -77,12 +66,10 @@ export default function Header() {
           onClick={() => setMenuOpen(!menuOpen)}
           className="focus:outline-none transition-transform active:scale-95 block relative"
         >
-          {/* Fallback com a inicial caso não encontre a foto */}
           <div className="w-10 h-10 rounded-full bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold text-xs shrink-0">
             {name.charAt(0).toUpperCase()}
           </div>
 
-          {/* Imagem do Perfil por cima se a URL existir */}
           {avatar && (
             <img 
               src={avatar} 
