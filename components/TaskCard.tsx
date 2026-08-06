@@ -1,5 +1,5 @@
 'use client';
-import { Check, Star, Heart, User, Briefcase, FileText, Coffee, Bookmark, Square, CheckSquare, Edit3, Image as ImageIcon } from 'lucide-react';
+import { Check, Star, Heart, User, Briefcase, FileText, Coffee, Bookmark, Square, CheckSquare, Edit3, Image as ImageIcon, Clock } from 'lucide-react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { triggerHaptic } from '../lib/haptics';
 
@@ -12,7 +12,7 @@ const ICONS_MAP: any = {
   Geral: Bookmark 
 };
 
-export default function TaskCard({ task, sectionType, onComplete, onEdit, onToggleCheck }: any) {
+export default function TaskCard({ task, sectionType, onComplete, onEdit, onToggleCheck, onSnooze }: any) {
   const Icon = ICONS_MAP[task.category] || Bookmark;
   
   const x = useMotionValue(0);
@@ -27,6 +27,9 @@ export default function TaskCard({ task, sectionType, onComplete, onEdit, onTogg
     sectionType === 'past' ? 'border-red-500/40 bg-red-950/10' :
     sectionType === 'today' ? 'border-amber-500/40 bg-amber-950/10' :
     'border-zinc-800 bg-zinc-900/90';
+
+  // Identifica se é item de saúde/remédio para destaque visual extra
+  const isMedication = task.category === 'Saúde' || /metadona|escitalopram|mg|cps|remédio/i.test(task.title);
 
   function handleDragEnd(event: any, info: any) {
     if (info.offset.x > 100 || info.offset.x < -100) {
@@ -53,13 +56,18 @@ export default function TaskCard({ task, sectionType, onComplete, onEdit, onTogg
       >
         <div className="flex justify-between items-start">
           <div className="flex gap-3 items-center">
-            <div className="p-2.5 rounded-2xl bg-indigo-500/10 text-indigo-400">
+            <div className={`p-2.5 rounded-2xl ${isMedication ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-indigo-500/10 text-indigo-400'}`}>
               <Icon size={18} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-sm text-zinc-100">{task.title}</h3>
                 {task.is_important && <Star size={14} className="text-amber-400 fill-amber-400" />}
+                {isMedication && (
+                  <span className="px-1.5 py-0.5 bg-red-500/20 text-red-300 border border-red-500/30 rounded-md text-[9px] font-bold tracking-wider uppercase">
+                    Medicação
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">{task.category}</span>
@@ -73,6 +81,17 @@ export default function TaskCard({ task, sectionType, onComplete, onEdit, onTogg
           </div>
           
           <div className="flex items-center gap-1">
+            {/* Botão de Adiar Rápido (+30 min) se houver horário */}
+            {task.reminder_time && onSnooze && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); triggerHaptic('light'); onSnooze(task.id); }} 
+                className="p-2.5 rounded-xl bg-zinc-800/80 text-zinc-400 hover:text-amber-400 hover:bg-zinc-700 transition-all"
+                title="Adiar por 30 minutos"
+              >
+                <Clock size={15} />
+              </button>
+            )}
+
             {/* Botão de Edição Dedicado no Card */}
             <button 
               onClick={(e) => { e.stopPropagation(); triggerHaptic('light'); onEdit(task); }} 
