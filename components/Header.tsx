@@ -12,12 +12,12 @@ export default function Header() {
   const router = useRouter();
 
   useEffect(() => {
-    // Captura instantânea da sessão ativa do Supabase (garante o avatar do Google)
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session?.user) setUser(data.session.user);
+    // Busca o usuário completo autenticado no Supabase
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) setUser(data.user);
     });
 
-    // Fecha o menu ao tocar fora dele
+    // Fecha o menu ao clicar fora
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setMenuOpen(false);
@@ -33,8 +33,14 @@ export default function Header() {
     router.push('/');
   }
 
+  // Varredura ampla em todas as possíveis origens da foto do Google no Supabase
+  const avatar = 
+    user?.user_metadata?.avatar_url || 
+    user?.user_metadata?.picture || 
+    user?.identities?.[0]?.identity_data?.avatar_url ||
+    user?.identities?.[0]?.identity_data?.picture;
+
   const name = user?.user_metadata?.full_name?.split(' ')[0] || 'Álefe';
-  const avatar = user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
 
   return (
     <header className="flex items-center justify-between px-6 pt-6 pb-4 bg-zinc-950/90 backdrop-blur-xl border-b border-zinc-900 sticky top-0 z-30">
@@ -45,7 +51,6 @@ export default function Header() {
         <p className="text-xs text-zinc-500 font-medium">Nexus • Gestão Inteligente</p>
       </div>
 
-      {/* Foto de Perfil com Menu Flutuante */}
       <div className="relative" ref={menuRef}>
         <button 
           onClick={() => setMenuOpen(!menuOpen)}
@@ -64,7 +69,6 @@ export default function Header() {
           )}
         </button>
 
-        {/* Dropdown Menu Flutuante */}
         {menuOpen && (
           <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95">
             <div className="px-4 py-2 border-b border-zinc-800/60 mb-1">
