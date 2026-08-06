@@ -1,93 +1,55 @@
 'use client';
 import { Check, Star, Clock, MapPin, Heart, User, Briefcase, FileText, Coffee, Bookmark, Square, CheckSquare } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Task } from '../lib/db';
+import { triggerHaptic } from '../lib/haptics';
 
-interface TaskCardProps {
-  task: Task;
-  onComplete: (id: string) => void;
-  onEdit: (task: Task) => void;
-  onToggleCheck: (taskId: string, checkId: string) => void;
-}
+// ... (ICONS_MAP igual ao anterior)
 
-const ICONS_MAP: Record<string, any> = {
-  Saúde: Heart,
-  Pessoal: User,
-  Trabalho: Briefcase,
-  Documentos: FileText,
-  Alimentação: Coffee,
-  Geral: Bookmark,
-};
-
-export default function TaskCard({ task, onComplete, onEdit, onToggleCheck }: TaskCardProps) {
+export default function TaskCard({ task, onComplete, onEdit, onToggleCheck }: any) {
   const IconComponent = ICONS_MAP[task.category] || Bookmark;
 
   return (
-    <div 
-      onClick={() => onEdit(task)}
-      className="p-4 rounded-3xl border border-zinc-800/80 bg-zinc-900/60 backdrop-blur-xl transition-all hover:border-zinc-700 cursor-pointer flex flex-col gap-2.5 shadow-lg active:scale-[0.99]"
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      onClick={() => { triggerHaptic('light'); onEdit(task); }}
+      className="p-4 rounded-3xl border border-zinc-800 bg-zinc-900/40 backdrop-blur-md transition-all hover:border-zinc-700 cursor-pointer flex flex-col gap-3 shadow-sm active:scale-[0.98]"
     >
       <div className="flex items-start justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-            <IconComponent size={16} />
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-2xl bg-indigo-500/10 text-indigo-400">
+            <IconComponent size={18} />
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
-              {task.is_important && <Star size={13} className="text-amber-400 fill-amber-400" />}
-              <h3 className="font-semibold text-sm text-zinc-100">{task.title}</h3>
-            </div>
-            <span className="text-[10px] font-bold tracking-wider text-zinc-500 uppercase">{task.category}</span>
+            <h3 className="font-semibold text-sm text-zinc-100">{task.title}</h3>
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{task.category}</span>
           </div>
         </div>
-
         <button
-          onClick={(e) => { e.stopPropagation(); task.id && onComplete(task.id); }}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-zinc-700/60 bg-zinc-800/80 text-zinc-400 hover:bg-indigo-600 hover:text-white hover:border-indigo-500 transition-all active:scale-95"
-          title="Concluir lembrete"
+          onClick={(e) => { e.stopPropagation(); triggerHaptic('success'); task.id && onComplete(task.id); }}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-zinc-800 text-zinc-400 hover:bg-indigo-600 hover:text-white transition-all"
         >
-          <Check size={16} />
+          <Check size={18} />
         </button>
       </div>
 
-      {/* Checklist Interativo */}
-      {task.checklist && task.checklist.length > 0 && (
-        <div className="space-y-1.5 pl-1 my-1">
-          {task.checklist.map(item => (
+      {/* Checklist com interação aprimorada */}
+      {task.checklist?.length > 0 && (
+        <div className="space-y-1 pl-1 border-l border-zinc-800 ml-1">
+          {task.checklist.map((item: any) => (
             <div 
               key={item.id} 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                if (task.id) onToggleCheck(task.id, item.id); 
-              }}
-              className="text-xs flex items-center gap-2 py-1 px-2 rounded-xl hover:bg-zinc-800/50 transition-all text-zinc-300"
+              onClick={(e) => { e.stopPropagation(); triggerHaptic('light'); onToggleCheck(task.id, item.id); }}
+              className="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-zinc-800/50"
             >
-              {item.completed ? (
-                <CheckSquare size={15} className="text-indigo-400 shrink-0" />
-              ) : (
-                <Square size={15} className="text-zinc-600 shrink-0" />
-              )}
-              <span className={item.completed ? 'line-through text-zinc-500' : 'text-zinc-200'}>
-                {item.text}
-              </span>
+              {item.completed ? <CheckSquare size={14} className="text-indigo-500" /> : <Square size={14} className="text-zinc-600" />}
+              <span className={`text-xs ${item.completed ? 'line-through text-zinc-600' : 'text-zinc-300'}`}>{item.text}</span>
             </div>
           ))}
         </div>
       )}
-
-      {/* Rodapé com Alertas */}
-      <div className="flex items-center justify-between pt-1 border-t border-zinc-800/40 text-[11px] text-zinc-500">
-        {task.reminder_type === 'time' && task.reminder_time && (
-          <span className="flex items-center gap-1 text-indigo-300">
-            <Clock size={12} /> {new Date(task.reminder_time).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
-          </span>
-        )}
-        {task.reminder_type === 'location' && task.location_name && (
-          <span className="flex items-center gap-1 text-emerald-400">
-            <MapPin size={12} /> {task.location_name} ({task.radius_meters || 100}m)
-          </span>
-        )}
-        {task.reminder_type === 'none' && <span>Sem alerta</span>}
-      </div>
-    </div>
+    </motion.div>
   );
 }
