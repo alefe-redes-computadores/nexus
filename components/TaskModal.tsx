@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Heart, User, Briefcase, FileText, Coffee, Bookmark, Smile, Dumbbell, Home, ShoppingBag, Car, Plane, Shield, Zap, BookOpen, Music, Code, Image as ImageIcon, Navigation, Check, Trash2, Edit2, Eye } from 'lucide-react';
+import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, User, Briefcase, FileText, Coffee, Bookmark, Smile, Dumbbell, Home, ShoppingBag, Car, Plane, Shield, Zap, BookOpen, Music, Code, Image as ImageIcon, Navigation, Check, Trash2, Edit2, Eye } from 'lucide-react';
 import { db, Task, CheckItem, Category } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { syncPushTask, syncPushCategory, uploadTaskAttachment } from '../lib/sync';
@@ -16,11 +16,6 @@ interface TaskModalProps {
   userId: string;
   initialTask?: Task | null;
 }
-
-const ICON_CATEGORIES = [
-  { category: 'Geral', icons: [User, Heart, Briefcase, FileText, Coffee, Bookmark, Home, ShoppingBag] },
-  { category: 'Estilo de Vida', icons: [Smile, Dumbbell, Car, Plane, Shield, Zap, BookOpen, Music, Code] }
-];
 
 export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, initialTask }: TaskModalProps) {
   const [title, setTitle] = useState(initialTask?.title || '');
@@ -43,13 +38,12 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   const [uploadingFile, setUploadingFile] = useState(false);
   const [editingAttachmentIndex, setEditingAttachmentIndex] = useState<number | null>(null);
   const [tempCustomName, setTempCustomName] = useState('');
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null); // Modal de visualização em tela cheia
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const [categoriesList, setCategoriesList] = useState<Category[]>([]);
   const [showNewCatInput, setShowNewCatInput] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('User');
-  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'none' | 'category' | 'time' | 'location' | 'attachment' | 'checklist'>('none');
   const [isRecurrenceOpen, setIsRecurrenceOpen] = useState(false);
@@ -123,11 +117,9 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     setChecklist(checklist.map(item => item.id === id ? { ...item, completed: !item.completed } : item));
   }
 
-  // Função para limpar a extensão do nome do arquivo na exibição inicial
-  function cleanFileName(fullName: string) {
-    const lastDot = fullName.lastIndexOf('.');
-    if (lastDot === -1) return fullName;
-    return fullName.substring(0, lastDot);
+  // Remove a extensão do nome para exibição limpa
+  function stripExtension(filename: string) {
+    return filename.replace(/\.[^/.]+$/, '');
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -140,13 +132,11 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
       const tempId = initialTask?.id || crypto.randomUUID();
       const publicUrl = await uploadTaskAttachment(file, tempId);
 
-      // Salva o nome limpo sem extensão como padrão inicial
-      const cleanName = cleanFileName(file.name);
-      const extension = file.name.substring(file.name.lastIndexOf('.'));
+      // Salva o nome sem extensão por padrão
+      const cleanName = stripExtension(file.name);
 
       setAttachments([...attachments, { 
         name: cleanName, 
-        originalExtension: extension,
         url: publicUrl, 
         type: file.type 
       }]);
@@ -162,7 +152,8 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   function saveAttachmentName(index: number) {
     if (!tempCustomName.trim()) return;
     const updated = [...attachments];
-    updated[index].name = tempCustomName.trim();
+    // Garante que o nome customizado não traga extensões acidentais digitadas pelo usuário
+    updated[index].name = stripExtension(tempCustomName.trim());
     setAttachments(updated);
     setEditingAttachmentIndex(null);
     setTempCustomName('');
@@ -444,7 +435,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               </div>
             )}
 
-            {/* GAVETA: GALERIA DE ANEXOS DE ELITE */}
+            {/* GAVETA: GALERIA DE ANEXOS LIMPA */}
             {activeTab === 'attachment' && (
               <div className="p-4 bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
                 <div className="flex justify-between items-center">
@@ -458,7 +449,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                     {attachments.map((file, idx) => (
                       <div key={idx} className="relative bg-zinc-900 border border-zinc-800 rounded-2xl p-2.5 flex flex-col justify-between group">
                         
-                        {/* Se estiver editando o nome */}
                         {editingAttachmentIndex === idx ? (
                           <div className="space-y-1.5 my-auto">
                             <input 
@@ -467,7 +457,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                               value={tempCustomName}
                               onChange={(e) => setTempCustomName(e.target.value)}
                               className="w-full bg-zinc-950 border border-indigo-500 rounded-lg px-2 py-1 text-xs text-white outline-none"
-                              placeholder="Novo nome..."
+                              placeholder="Nome limpo..."
                             />
                             <div className="flex gap-1 justify-end">
                               <button type="button" onClick={() => saveAttachmentName(idx)} className="px-2 py-1 bg-indigo-600 text-white rounded-md text-[10px] font-bold">Salvar</button>
@@ -493,7 +483,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                                   type="button" 
                                   onClick={() => { setEditingAttachmentIndex(idx); setTempCustomName(file.name); }}
                                   className="p-1.5 bg-zinc-800 text-zinc-300 hover:text-indigo-400 rounded-lg transition-all"
-                                  title="Renomear Arquivo"
+                                  title="Renomear Arquivo (Sem extensão)"
                                 >
                                   <Edit2 size={13} />
                                 </button>
@@ -509,7 +499,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                             </div>
                             <div>
                               <p className="text-xs font-semibold text-zinc-200 truncate" title={file.name}>{file.name}</p>
-                              <p className="text-[9px] text-zinc-500 uppercase font-mono">{file.type?.split('/')[1] || 'arquivo'}</p>
+                              <p className="text-[9px] text-zinc-500 uppercase font-mono">arquivo nuvem</p>
                             </div>
                           </>
                         )}
@@ -572,7 +562,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
 
       </div>
 
-      {/* MODAL DE VISUALIZAÇÃO EM TELA CHEIA (LIGHTBOX) */}
+      {/* LIGHTBOX / TELA CHEIA */}
       {previewUrl && (
         <div className="fixed inset-0 z-60 bg-black/95 backdrop-blur-md flex items-center justify-center p-4">
           <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col items-center">
