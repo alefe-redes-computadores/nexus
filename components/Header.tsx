@@ -36,17 +36,19 @@ export default function Header() {
     router.push('/');
   }
 
-  // Captura segura de todas as variações de avatar do Google/Supabase
-  const metadata = user?.user_metadata || {};
-  const identityData = user?.identities?.[0]?.identity_data || {};
-  
-  const avatar = 
-    metadata.avatar_url || 
-    metadata.picture || 
-    identityData.avatar_url || 
-    identityData.picture;
+  // Captura abrangente de todas as propriedades possíveis de foto do Google/Supabase
+  const meta = user?.user_metadata || {};
+  const identity = user?.identities?.[0]?.identity_data || {};
 
-  const fullName = metadata.full_name || identityData.full_name || 'Álefe';
+  const avatar = 
+    meta.avatar_url || 
+    meta.picture || 
+    identity.avatar_url || 
+    identity.picture ||
+    user?.raw_user_meta_data?.avatar_url ||
+    user?.raw_user_meta_data?.picture;
+
+  const fullName = meta.full_name || identity.full_name || 'Álefe';
   const name = fullName.split(' ')[0];
 
   return (
@@ -73,22 +75,23 @@ export default function Header() {
       <div className="relative shrink-0" ref={menuRef}>
         <button 
           onClick={() => setMenuOpen(!menuOpen)}
-          className="focus:outline-none transition-transform active:scale-95 block"
+          className="focus:outline-none transition-transform active:scale-95 block relative"
         >
-          {avatar ? (
+          {/* Fallback com a inicial caso não encontre a foto */}
+          <div className="w-10 h-10 rounded-full bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold text-xs shrink-0">
+            {name.charAt(0).toUpperCase()}
+          </div>
+
+          {/* Imagem do Perfil por cima se a URL existir */}
+          {avatar && (
             <img 
               src={avatar} 
               alt="Perfil" 
-              className="w-10 h-10 rounded-full border-2 border-indigo-500/50 object-cover shadow-md shrink-0"
+              className="absolute inset-0 w-10 h-10 rounded-full border-2 border-indigo-500/50 object-cover shadow-md shrink-0"
               onError={(e) => {
-                // Se a imagem falhar, oculta a tag para mostrar o fallback por trás
                 (e.target as HTMLElement).style.display = 'none';
               }}
             />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold text-xs shrink-0">
-              {name.charAt(0).toUpperCase()}
-            </div>
           )}
         </button>
 
