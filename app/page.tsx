@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { db, Task } from '../lib/db';
 import { initAutoSync } from '../lib/sync';
 import { startGeofenceWatcher } from '../lib/notifications';
+import { processRecurrence } from '../lib/recurrence';
 import Header from '../components/Header';
 import QuickInputBar from '../components/QuickInputBar';
 import TaskModal from '../components/TaskModal';
@@ -51,9 +52,16 @@ export default function Epicentro() {
   async function handleCompleteTask(id: string) {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
+    
     const newStatus = 'archived';
+    
+    // Atualiza local e nuvem
     await db.tasks.update(id, { status: newStatus });
     await supabase.from('tasks').update({ status: newStatus }).eq('id', id);
+
+    // Processa a Recorrência Inteligente (Gera a próxima ocorrência automaticamente se houver)
+    await processRecurrence(task);
+
     loadTasks();
   }
 
@@ -99,7 +107,7 @@ export default function Epicentro() {
         </div>
       )}
 
-      {/* Título de Seção Limpo (Sem abas de To Do) */}
+      {/* Título de Seção Limpo */}
       <div className="px-6 mt-6 mb-4 flex items-center justify-between">
         <h2 className="text-xs font-bold tracking-widest uppercase text-zinc-500">
           Atividades Ativas ({filteredTasks.length})
