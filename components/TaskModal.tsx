@@ -1,8 +1,12 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Plus, Heart, User, Briefcase, FileText, Coffee, Bookmark, Navigation } from 'lucide-react';
+import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Plus, Heart, User, Briefcase, FileText, Coffee, Bookmark } from 'lucide-react';
 import { db, Task, CheckItem, Category } from '../lib/db';
 import { supabase } from '../lib/supabase';
+import dynamic from 'next/dynamic';
+
+// Importação dinâmica do componente de mapa para evitar erros de SSR no Next.js
+const MapPicker = dynamic(() => import('./MapPicker'), { ssr: false });
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -32,11 +36,11 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   const [reminderTime, setReminderTime] = useState(initialTask?.reminder_time || '');
   const [recurrence, setRecurrence] = useState<any>(initialTask?.recurrence || 'none');
   
-  const [locationName, setLocationName] = useState(initialTask?.location_name || '');
-  const [lat, setLat] = useState<number | undefined>(initialTask?.lat);
-  const [lng, setLng] = useState<number | undefined>(initialTask?.lng);
+  // Localização via Mapa Interativo
+  const [locationName, setLocationName] = useState(initialTask?.location_name || 'Local Selecionado no Mapa');
+  const [lat, setLat] = useState<number | undefined>(initialTask?.lat || -18.5808); // Patos de Minas como padrão
+  const [lng, setLng] = useState<number | undefined>(initialTask?.lng || -46.5181);
   const [radiusMeters, setRadiusMeters] = useState(initialTask?.radius_meters || 100);
-  const [loadingGps, setLoadingGps] = useState(false);
 
   const [categoriesList, setCategoriesList] = useState<Category[]>([]);
   const [showNewCatInput, setShowNewCatInput] = useState(false);
@@ -73,39 +77,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     setShowNewCatInput(false);
     loadCategories();
     setCategory(newCatName.trim());
-  }
-
-  function handleCaptureGpsLocation() {
-    if (!navigator.geolocation) {
-      alert('Seu dispositivo não suporta geolocalização.');
-      return;
-    }
-
-    setLoadingGps(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const currentLat = position.coords.latitude;
-        const currentLng = position.coords.longitude;
-        setLat(currentLat);
-        setLng(currentLng);
-
-        try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentLat}&lon=${currentLng}`);
-          const data = await res.json();
-          const address = data.display_name ? data.display_name.split(',')[0] : `Lat: ${currentLat.toFixed(4)}, Lng: ${currentLng.toFixed(4)}`;
-          setLocationName(address);
-        } catch {
-          setLocationName(`GPS (${currentLat.toFixed(4)}, ${currentLng.toFixed(4)})`);
-        } finally {
-          setLoadingGps(false);
-        }
-      },
-      (error) => {
-        alert('Erro ao obter GPS: ' + error.message);
-        setLoadingGps(false);
-      },
-      { enableHighAccuracy: true }
-    );
   }
 
   if (!isOpen) return null;
@@ -205,7 +176,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               autoFocus
               type="text"
               className="w-full bg-zinc-950/60 border border-zinc-800 rounded-2xl p-4 pr-12 text-sm outline-none focus:border-indigo-500 text-zinc-100 placeholder-zinc-500 transition-all shadow-inner"
-              placeholder="O que precisa ser feito? (Ex: Renovar Receitas)"
+              placeholder="O que precisa ser feito? (Ex: Comprar remédio na farmácia)"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -331,33 +302,27 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
             </div>
           )}
 
+          {/* Seletor de Localização com Mapa Interativo e Raio Visual */}
           {reminderType === 'location' && (
             <div className="p-3.5 bg-zinc-950/40 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
               <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                <MapPin size={14} className="text-indigo-400" /> Alerta por GPS (Geofencing)
+                <MapPin size={14} className="text-indigo-400" /> Selecione o local no mapa:
               </label>
               
-              <div className="flex items-center gap-2">
-                <input 
-                  type="text"
-                  readOnly
-                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 outline-none"
-                  placeholder="Nenhum local selecionado..."
-                  value={locationName}
-                />
-                <button
-                  type="button"
-                  onClick={handleCaptureGpsLocation}
-                  disabled={loadingGps}
-                  className="px-3 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold text-white flex items-center gap-1 shrink-0 active:scale-95 transition-all"
-                >
-                  <Navigation size={14} className={loadingGps ? 'animate-spin' : ''} /> {loadingGps ? 'Buscando...' : 'Marcar Local Atual'}
-                </button>
-              </div>
+              <MapPicker 
+                lat={lat} 
+                lng={lng} 
+                radius={radiusMeters} 
+                onLocationChange={(newLat: number, newLng: number) => { 
+                  setLat(newLat); 
+                  setLng(newLng); 
+                  setLocationName(`Lat: ${newLat.toFixed(4)}, Lng: ${newLng.toFixed(4)}`);
+                }} 
+              />
 
               <div className="space-y-1 pt-1">
                 <div className="flex justify-between text-xs text-zinc-400">
-                  <span>Raio de proximidade:</span>
+                  <span>Raio de alcance do alerta:</span>
                   <strong className="text-indigo-400 font-bold">{radiusMeters} metros</strong>
                 </div>
                 <input 
@@ -369,6 +334,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                   onChange={(e) => setRadiusMeters(Number(e.target.value))}
                   className="w-full accent-indigo-500 bg-zinc-900 cursor-pointer"
                 />
+                <span className="text-[10px] text-zinc-500 block">O círculo azul no mapa indica a área de disparo.</span>
               </div>
             </div>
           )}
