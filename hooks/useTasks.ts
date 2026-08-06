@@ -18,15 +18,24 @@ export function useTasks(userId: string | null) {
     loadTasks();
   }, [userId]);
 
-  // Agrupamento Inteligente por Prazos e Filtro de Pesquisa
+  // Agrupamento Inteligente por Prazos e Filtro de Pesquisa Avançado (Incluindo Anexos)
   const categorizedTasks = useMemo(() => {
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10);
 
-    const filtered = tasks.filter(t => 
-      t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.category.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const query = searchQuery.toLowerCase().trim();
+
+    const filtered = tasks.filter(t => {
+      const matchTitle = t.title.toLowerCase().includes(query);
+      const matchCategory = t.category.toLowerCase().includes(query);
+      
+      // Procura também se algum dos anexos possui o nome pesquisado
+      const matchAttachments = t.attachments?.some((att: any) => 
+        att.name && att.name.toLowerCase().includes(query)
+      );
+
+      return matchTitle || matchCategory || matchAttachments;
+    });
 
     const past: Task[] = [];
     const today: Task[] = [];
