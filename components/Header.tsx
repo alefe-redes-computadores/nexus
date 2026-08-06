@@ -65,7 +65,7 @@ export default function Header() {
         <p className="text-xs text-zinc-500 font-medium mt-0.5">Nexus • Gestão Inteligente</p>
       </div>
 
-      <div className="relative" ref={menuRef}>
+      <div className="relative shrink-0" ref={menuRef}>
         <button 
           onClick={() => setMenuOpen(!menuOpen)}
           className="focus:outline-none transition-transform active:scale-95 block"
@@ -74,10 +74,10 @@ export default function Header() {
             <img 
               src={avatar} 
               alt="Perfil" 
-              className="w-10 h-10 rounded-full border-2 border-indigo-500/50 object-cover shadow-md"
+              className="w-10 h-10 rounded-full border-2 border-indigo-500/50 object-cover shadow-md shrink-0"
             />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
+            <div className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0">
               <UserIcon size={18} />
             </div>
           )}
