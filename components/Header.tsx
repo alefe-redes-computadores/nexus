@@ -87,6 +87,7 @@ export default function Header() {
             <img 
               src={avatar} 
               alt="Perfil" 
+              referrerPolicy="no-referrer"
               className="absolute inset-0 w-10 h-10 rounded-full border-2 border-indigo-500/50 object-cover shadow-md shrink-0"
               onError={(e) => {
                 (e.target as HTMLElement).style.display = 'none';
