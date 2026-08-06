@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Plus, Heart, User, Briefcase, FileText, Coffee, Bookmark, Smile, Dumbbell, Home, ShoppingBag, Car, Plane, Shield, Zap, BookOpen, Music, Code, Image as ImageIcon, Navigation, Check, Trash2 } from 'lucide-react';
+import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Heart, User, Briefcase, FileText, Coffee, Bookmark, Smile, Dumbbell, Home, ShoppingBag, Car, Plane, Shield, Zap, BookOpen, Music, Code, Image as ImageIcon, Navigation, Check, Trash2, Edit2, Eye } from 'lucide-react';
 import { db, Task, CheckItem, Category } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { syncPushTask, syncPushCategory, uploadTaskAttachment } from '../lib/sync';
@@ -38,9 +38,12 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   const [lng, setLng] = useState<number | undefined>(initialTask?.lng || -46.5181);
   const [radiusMeters, setRadiusMeters] = useState(initialTask?.radius_meters || 100);
 
-  // Gerenciamento de Anexos
+  // Gerenciamento Avançado de Anexos
   const [attachments, setAttachments] = useState<any[]>(initialTask?.attachments || []);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [editingAttachmentIndex, setEditingAttachmentIndex] = useState<number | null>(null);
+  const [tempCustomName, setTempCustomName] = useState('');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null); // Modal de visualização em tela cheia
 
   const [categoriesList, setCategoriesList] = useState<Category[]>([]);
   const [showNewCatInput, setShowNewCatInput] = useState(false);
@@ -62,7 +65,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     let cats = await db.categories.toArray();
     if (cats.length === 0) {
       const defaultCats: Category[] = [
-        { id: crypto.randomUUID(), name: 'Saúde', icon: 'Heart' },
         { id: crypto.randomUUID(), name: 'Pessoal', icon: 'User' },
         { id: crypto.randomUUID(), name: 'Trabalho', icon: 'Briefcase' },
         { id: crypto.randomUUID(), name: 'Documentos', icon: 'FileText' }
@@ -121,6 +123,13 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     setChecklist(checklist.map(item => item.id === id ? { ...item, completed: !item.completed } : item));
   }
 
+  // Função para limpar a extensão do nome do arquivo na exibição inicial
+  function cleanFileName(fullName: string) {
+    const lastDot = fullName.lastIndexOf('.');
+    if (lastDot === -1) return fullName;
+    return fullName.substring(0, lastDot);
+  }
+
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -131,7 +140,16 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
       const tempId = initialTask?.id || crypto.randomUUID();
       const publicUrl = await uploadTaskAttachment(file, tempId);
 
-      setAttachments([...attachments, { name: file.name, url: publicUrl, type: file.type }]);
+      // Salva o nome limpo sem extensão como padrão inicial
+      const cleanName = cleanFileName(file.name);
+      const extension = file.name.substring(file.name.lastIndexOf('.'));
+
+      setAttachments([...attachments, { 
+        name: cleanName, 
+        originalExtension: extension,
+        url: publicUrl, 
+        type: file.type 
+      }]);
       triggerHaptic('success');
     } catch (err) {
       console.error('Erro ao enviar arquivo:', err);
@@ -139,6 +157,16 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     } finally {
       setUploadingFile(false);
     }
+  }
+
+  function saveAttachmentName(index: number) {
+    if (!tempCustomName.trim()) return;
+    const updated = [...attachments];
+    updated[index].name = tempCustomName.trim();
+    setAttachments(updated);
+    setEditingAttachmentIndex(null);
+    setTempCustomName('');
+    triggerHaptic('light');
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -154,7 +182,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
       status: initialTask?.status || 'pending',
       is_important: isImportant,
       checklist,
-      attachments, // Salva os arquivos anexados na nuvem
+      attachments, 
       recurrence,
       reminder_type: reminderType,
       reminder_time: reminderType === 'time' ? reminderTime : undefined,
@@ -189,7 +217,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
         <div>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xs font-bold text-zinc-400 tracking-wider uppercase">
-              {initialTask ? 'Editar Lembrete' : 'Adicionar Lembrete'}
+              {initialTask ? 'Editar Tarefa' : 'Nova Tarefa'}
             </h2>
             <div className="flex items-center gap-1.5">
               <button 
@@ -258,7 +286,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                 type="button"
                 onClick={() => { triggerHaptic('light'); setActiveTab(activeTab === 'attachment' ? 'none' : 'attachment'); }}
                 className={`p-2.5 rounded-xl transition-all ${activeTab === 'attachment' ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'}`}
-                title="Anexo / Imagem"
+                title="Galeria de Anexos"
               >
                 <ImageIcon size={18} />
               </button>
@@ -416,28 +444,82 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               </div>
             )}
 
-            {/* GAVETA: ANEXOS (COM UPLOAD REAL NA NUVEM) */}
+            {/* GAVETA: GALERIA DE ANEXOS DE ELITE */}
             {activeTab === 'attachment' && (
               <div className="p-4 bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Arquivos e Imagens na Nuvem</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Galeria de Anexos</span>
+                  <span className="text-[10px] text-zinc-500">{attachments.length} arquivo(s)</span>
+                </div>
                 
-                {/* Lista de anexos já adicionados */}
+                {/* Grid de Miniaturas */}
                 {attachments.length > 0 && (
-                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
                     {attachments.map((file, idx) => (
-                      <div key={idx} className="flex items-center justify-between bg-zinc-900 px-3 py-2 rounded-xl text-xs border border-zinc-800">
-                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-indigo-400 hover:underline truncate">
-                          <FileText size={14} /> <span className="truncate">{file.name}</span>
-                        </a>
-                        <button type="button" onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))} className="text-zinc-500 hover:text-red-400">
-                          <Trash2 size={14} />
-                        </button>
+                      <div key={idx} className="relative bg-zinc-900 border border-zinc-800 rounded-2xl p-2.5 flex flex-col justify-between group">
+                        
+                        {/* Se estiver editando o nome */}
+                        {editingAttachmentIndex === idx ? (
+                          <div className="space-y-1.5 my-auto">
+                            <input 
+                              type="text" 
+                              autoFocus
+                              value={tempCustomName}
+                              onChange={(e) => setTempCustomName(e.target.value)}
+                              className="w-full bg-zinc-950 border border-indigo-500 rounded-lg px-2 py-1 text-xs text-white outline-none"
+                              placeholder="Novo nome..."
+                            />
+                            <div className="flex gap-1 justify-end">
+                              <button type="button" onClick={() => saveAttachmentName(idx)} className="px-2 py-1 bg-indigo-600 text-white rounded-md text-[10px] font-bold">Salvar</button>
+                              <button type="button" onClick={() => setEditingAttachmentIndex(null)} className="px-2 py-1 bg-zinc-800 text-zinc-400 rounded-md text-[10px]">Cancelar</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl">
+                                <FileText size={16} />
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button 
+                                  type="button" 
+                                  onClick={() => setPreviewUrl(file.url)}
+                                  className="p-1.5 bg-zinc-800 text-zinc-300 hover:text-white rounded-lg transition-all"
+                                  title="Visualizar em Tela Cheia"
+                                >
+                                  <Eye size={13} />
+                                </button>
+                                <button 
+                                  type="button" 
+                                  onClick={() => { setEditingAttachmentIndex(idx); setTempCustomName(file.name); }}
+                                  className="p-1.5 bg-zinc-800 text-zinc-300 hover:text-indigo-400 rounded-lg transition-all"
+                                  title="Renomear Arquivo"
+                                >
+                                  <Edit2 size={13} />
+                                </button>
+                                <button 
+                                  type="button" 
+                                  onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))} 
+                                  className="p-1.5 bg-zinc-800 text-red-400 hover:bg-red-500/20 rounded-lg transition-all"
+                                  title="Excluir"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold text-zinc-200 truncate" title={file.name}>{file.name}</p>
+                              <p className="text-[9px] text-zinc-500 uppercase font-mono">{file.type?.split('/')[1] || 'arquivo'}</p>
+                            </div>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
                 )}
 
-                <div className="text-center p-4 border border-dashed border-zinc-800 rounded-xl bg-zinc-900/40">
+                {/* Botão de Upload */}
+                <div className="text-center p-4 border border-dashed border-zinc-800 rounded-2xl bg-zinc-900/40">
                   <ImageIcon size={24} className="mx-auto text-indigo-400 mb-1" />
                   <p className="text-xs font-bold text-zinc-200">{uploadingFile ? 'Enviando para a nuvem...' : 'Adicionar novo arquivo'}</p>
                   <input 
@@ -483,12 +565,41 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               disabled={loading || uploadingFile}
               className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold text-xs tracking-wider uppercase shadow-xl shadow-indigo-600/30 active:scale-98 transition-all disabled:opacity-50 mt-4 text-white"
             >
-              {loading ? 'Salvando...' : (initialTask ? 'Salvar Alterações' : 'Criar Lembrete')}
+              {loading ? 'Salvando...' : (initialTask ? 'Salvar Alterações' : 'Criar Tarefa')}
             </button>
           </form>
         </div>
 
       </div>
+
+      {/* MODAL DE VISUALIZAÇÃO EM TELA CHEIA (LIGHTBOX) */}
+      {previewUrl && (
+        <div className="fixed inset-0 z-60 bg-black/95 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col items-center">
+            <button 
+              onClick={() => setPreviewUrl(null)}
+              className="absolute -top-12 right-0 p-2 bg-zinc-800 text-white rounded-full hover:bg-zinc-700 transition-all"
+            >
+              <X size={20} />
+            </button>
+            <div className="w-full overflow-auto bg-zinc-900 border border-zinc-800 rounded-3xl p-4 flex items-center justify-center max-h-[80vh]">
+              {previewUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) || previewUrl.includes('image') ? (
+                <img src={previewUrl} alt="Visualização" className="max-w-full max-h-[75vh] object-contain rounded-xl" />
+              ) : (
+                <iframe src={previewUrl} className="w-full h-[75vh] rounded-xl bg-white" title="Documento" />
+              )}
+            </div>
+            <a 
+              href={previewUrl} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="mt-4 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg transition-all"
+            >
+              Abrir em Nova Aba / Baixar
+            </a>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
