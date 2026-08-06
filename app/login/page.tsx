@@ -26,45 +26,105 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[85vh] px-4 bg-[#09090b]">
-      <div className="w-full max-w-sm flex flex-col items-center gap-6 p-8 rounded-3xl bg-zinc-900 border border-zinc-800 shadow-2xl">
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '100vh',
+      backgroundColor: '#09090b',
+      padding: '16px',
+      color: '#f4f4f5',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: '380px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '24px',
+        padding: '32px 24px',
+        borderRadius: '24px',
+        backgroundColor: '#18181b',
+        border: '1px solid #27272a',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+      }}>
         
-        {/* Logo do App com tamanho travado (64x64) */}
-        <div className="flex flex-col items-center gap-3">
-          <div className="relative rounded-2xl overflow-hidden shadow-lg border border-zinc-700/50 flex items-center justify-center bg-black w-16 h-16">
+        {/* Header e Logo */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '16px',
+            overflow: 'hidden',
+            border: '1px solid #3f3f46',
+            backgroundColor: '#000',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
             <Image 
               src="/logo.png" 
               alt="Nexus Logo" 
               width={64} 
               height={64} 
-              className="object-cover"
+              style={{ objectFit: 'cover' }}
               priority
             />
           </div>
-          <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-white">Nexus</h1>
-            <p className="text-xs tracking-wider text-zinc-400 uppercase mt-0.5">Gestão Inteligente</p>
+          <div style={{ textAlign: 'center' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#ffffff', margin: 0 }}>Nexus</h1>
+            <p style={{ fontSize: '11px', color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '1px', marginTop: '4px' }}>
+              Gestão Inteligente
+            </p>
           </div>
         </div>
 
         {error && (
-          <div className="w-full p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs text-center">
+          <div style={{
+            width: '100%',
+            padding: '12px',
+            borderRadius: '12px',
+            backgroundColor: 'rgba(244, 63, 94, 0.1)',
+            border: '1px solid rgba(244, 63, 94, 0.2)',
+            color: '#fb7185',
+            fontSize: '12px',
+            textAlign: 'center'
+          }}>
             {error}
           </div>
         )}
 
+        {/* Botão Google */}
         <button
           onClick={handleGoogleLogin}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-3 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 font-medium py-3 px-4 rounded-2xl transition-all disabled:opacity-50 mt-4"
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '12px',
+            backgroundColor: '#09090b',
+            border: '1px solid #27272a',
+            color: '#e4e4e7',
+            fontWeight: '600',
+            fontSize: '14px',
+            padding: '12px 16px',
+            borderRadius: '16px',
+            cursor: loading ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.5 : 1,
+            outline: 'none'
+          }}
         >
-          <svg className="w-4 h-4" viewBox="0 0 24 24">
+          <svg width="20" height="20" viewBox="0 0 24 24" style={{ minWidth: '20px', minHeight: '20px' }}>
             <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.8 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.4l3.7 2.9C6.2 7.1 8.9 5 12 5z"/>
             <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/>
             <path fill="#FBBC05" d="M5.3 14.7c-.2-.7-.4-1.5-.4-2.7s.2-2 .4-2.7L1.6 6.4C.6 8.4 0 10.6 0 13s.6 4.6 1.6 6.6l3.7-2.9z"/>
             <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.8-2.1-6.7-5.3L1.6 15C3.5 18.9 7.4 23 12 23z"/>
           </svg>
-          <span className="text-sm font-semibold">{loading ? 'Conectando...' : 'Entrar com o Google'}</span>
+          <span>{loading ? 'Conectando...' : 'Entrar com o Google'}</span>
         </button>
 
       </div>
