@@ -1,11 +1,12 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Plus, Heart, User, Briefcase, FileText, Coffee, Bookmark, Navigation } from 'lucide-react';
+import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Plus, Heart, User, Briefcase, FileText, Coffee, Bookmark } from 'lucide-react';
 import { db, Task, CheckItem, Category } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { syncPushTask } from '../lib/sync';
 import dynamic from 'next/dynamic';
 
+// Importação dinâmica do componente de mapa para evitar erros de SSR no Next.js
 const MapPicker = dynamic(() => import('./MapPicker'), { ssr: false });
 
 interface TaskModalProps {
@@ -36,8 +37,9 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   const [reminderTime, setReminderTime] = useState(initialTask?.reminder_time || '');
   const [recurrence, setRecurrence] = useState<any>(initialTask?.recurrence || 'none');
   
+  // Localização via Mapa Interativo
   const [locationName, setLocationName] = useState(initialTask?.location_name || 'Local Selecionado no Mapa');
-  const [lat, setLat] = useState<number | undefined>(initialTask?.lat || -18.5808);
+  const [lat, setLat] = useState<number | undefined>(initialTask?.lat || -18.5808); // Patos de Minas como padrão
   const [lng, setLng] = useState<number | undefined>(initialTask?.lng || -46.5181);
   const [radiusMeters, setRadiusMeters] = useState(initialTask?.radius_meters || 100);
 
@@ -57,8 +59,10 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     let cats = await db.categories.toArray();
     if (cats.length === 0) {
       const defaultCats: Category[] = [
-        { name: 'Saúde', icon: 'Heart' }, { name: 'Pessoal', icon: 'User' },
-        { name: 'Trabalho', icon: 'Briefcase' }, { name: 'Documentos', icon: 'FileText' }
+        { name: 'Saúde', icon: 'Heart' },
+        { name: 'Pessoal', icon: 'User' },
+        { name: 'Trabalho', icon: 'Briefcase' },
+        { name: 'Documentos', icon: 'FileText' }
       ];
       await db.categories.bulkAdd(defaultCats);
       cats = await db.categories.toArray();
@@ -76,9 +80,14 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     setCategory(newCatName.trim());
   }
 
+  if (!isOpen) return null;
+
   function handleVoiceInput() {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) return alert('Seu navegador não suporta ditado.');
+    if (!SpeechRecognition) {
+      alert('Seu navegador não suporta ditado por voz.');
+      return;
+    }
     const recognition = new SpeechRecognition();
     recognition.lang = 'pt-BR';
     recognition.onstart = () => setIsListening(true);
@@ -86,6 +95,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
       setTitle(event.results[0][0].transcript);
       setIsListening(false);
     };
+    recognition.onerror = () => setIsListening(false);
     recognition.onend = () => setIsListening(false);
     recognition.start();
   }
@@ -98,10 +108,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
 
   function toggleCheckItem(id: string) {
     setChecklist(checklist.map(item => item.id === id ? { ...item, completed: !item.completed } : item));
-  }
-
-  function removeChecklistItem(id: string) {
-    setChecklist(checklist.filter(item => item.id !== id));
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -127,78 +133,269 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     };
 
     try {
+      // Sincronização automática integrada via syncPushTask
       await syncPushTask(taskData);
       onTaskCreated();
       onClose();
-    } catch (err) { console.error(err); } finally { setLoading(false); }
+    } catch (err) {
+      console.error('Erro ao salvar:', err);
+    } finally {
+      setLoading(false);
+    }
   }
-
-  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4 overflow-y-auto">
       <div className="w-full max-w-lg rounded-t-[32px] sm:rounded-3xl border border-zinc-800 bg-zinc-900/95 backdrop-blur-2xl p-6 shadow-2xl animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto font-sans">
         
         <div className="flex justify-between items-center mb-5">
-          <h2 className="text-base font-bold text-zinc-100 tracking-tight">{initialTask ? 'Editar Lembrete' : 'Novo Lembrete'}</h2>
-          <button onClick={onClose} className="p-2.5 rounded-2xl bg-zinc-800/80 text-zinc-400"><X size={16} /></button>
+          <h2 className="text-base font-bold text-zinc-100 tracking-tight">
+            {initialTask ? 'Editar Lembrete' : 'Novo Lembrete'}
+          </h2>
+          <div className="flex items-center gap-1.5">
+            <button 
+              type="button" 
+              onClick={() => setIsImportant(!isImportant)} 
+              className={`p-2.5 rounded-2xl transition-all ${isImportant ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-zinc-800/80 text-zinc-400 border border-zinc-700/50'}`}
+              title="Marcar como Importante"
+            >
+              <Star size={16} fill={isImportant ? 'currentColor' : 'none'} />
+            </button>
+            <button onClick={onClose} className="p-2.5 rounded-2xl bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 hover:text-white transition-all">
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSave} className="space-y-4">
           <div className="relative">
-            <input autoFocus type="text" className="w-full bg-zinc-950/60 border border-zinc-800 rounded-2xl p-4 pr-12 text-sm text-zinc-100" placeholder="O que precisa ser feito?" value={title} onChange={(e) => setTitle(e.target.value)} />
-            <button type="button" onClick={handleVoiceInput} className={`absolute right-3.5 top-3.5 p-2 rounded-xl ${isListening ? 'bg-red-500 text-white' : 'text-zinc-400'}`}><Mic size={16} /></button>
+            <input 
+              autoFocus
+              type="text"
+              className="w-full bg-zinc-950/60 border border-zinc-800 rounded-2xl p-4 pr-12 text-sm outline-none focus:border-indigo-500 text-zinc-100 placeholder-zinc-500 transition-all shadow-inner"
+              placeholder="O que precisa ser feito? (Ex: Comprar remédio na farmácia)"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+            <button 
+              type="button"
+              onClick={handleVoiceInput}
+              className={`absolute right-3.5 top-3.5 p-2 rounded-xl transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-zinc-400 hover:text-indigo-400 bg-zinc-900'}`}
+              title="Ditado por voz"
+            >
+              <Mic size={16} />
+            </button>
           </div>
 
           <div>
-            <label className="text-[10px] font-bold uppercase text-zinc-500">Categoria / Lista</label>
-            <div className="flex gap-2 overflow-x-auto py-2">
-              {categoriesList.map(cat => (
-                <button key={cat.name} type="button" onClick={() => setCategory(cat.name)} className={`px-4 py-2 rounded-xl text-xs font-semibold ${category === cat.name ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}>{cat.name}</button>
-              ))}
-              <button type="button" onClick={() => setShowNewCatInput(!showNewCatInput)} className="px-4 py-2 rounded-xl bg-zinc-800 text-indigo-400 text-xs font-semibold">+ Nova</button>
+            <div className="flex justify-between items-center mb-2">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Categoria / Lista</label>
+              <button 
+                type="button" 
+                onClick={() => setShowNewCatInput(!showNewCatInput)}
+                className="text-[11px] text-indigo-400 font-semibold flex items-center gap-1"
+              >
+                <Plus size={12} /> Nova Categoria
+              </button>
             </div>
+
             {showNewCatInput && (
-              <div className="flex gap-2 p-2 bg-zinc-950 rounded-xl mb-2">
-                <input className="flex-1 bg-transparent text-xs p-1" value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Nome..." />
-                <button type="button" onClick={handleAddCategory} className="text-xs text-indigo-400 font-bold">Salvar</button>
+              <div className="space-y-2 mb-3 p-3 bg-zinc-950 border border-zinc-800 rounded-2xl">
+                <input 
+                  type="text" 
+                  placeholder="Nome da categoria..." 
+                  value={newCatName} 
+                  onChange={e => setNewCatName(e.target.value)} 
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 outline-none"
+                />
+                <div className="flex gap-2 items-center">
+                  <span className="text-[10px] text-zinc-500">Ícone:</span>
+                  <div className="flex gap-1 overflow-x-auto">
+                    {AVAILABLE_ICONS.map(item => {
+                      const IconComponent = item.icon;
+                      return (
+                        <button
+                          key={item.name}
+                          type="button"
+                          onClick={() => setSelectedIcon(item.name)}
+                          className={`p-2 rounded-lg border ${selectedIcon === item.name ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}
+                        >
+                          <IconComponent size={14} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button type="button" onClick={handleAddCategory} className="ml-auto px-3 py-1.5 bg-indigo-600 text-xs font-bold text-white rounded-xl">Criar</button>
+                </div>
               </div>
             )}
+
+            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+              {categoriesList.map((cat) => (
+                <button 
+                  key={cat.id || cat.name}
+                  type="button"
+                  onClick={() => setCategory(cat.name)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold shrink-0 transition-all ${
+                    category === cat.name 
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-bold' 
+                      : 'bg-zinc-800/60 text-zinc-400 border border-zinc-700/40 hover:border-zinc-600'
+                  }`}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            {['none', 'time', 'location'].map((type) => (
-              <button key={type} type="button" onClick={() => setReminderType(type as any)} className={`py-2 text-xs rounded-xl border ${reminderType === type ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}>
-                {type === 'none' ? 'Padrão' : type === 'time' ? 'Horário' : 'Local'}
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-2 block">Gatilho de Alerta</label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setReminderType('none')}
+                className={`py-2 text-xs rounded-xl font-medium border transition-all ${reminderType === 'none' ? 'bg-zinc-700 border-zinc-500 text-white font-bold' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}
+              >
+                Padrão
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => setReminderType('time')}
+                className={`flex items-center justify-center gap-1.5 py-2 text-xs rounded-xl font-medium border transition-all ${reminderType === 'time' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 font-bold' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}
+              >
+                <Clock size={14} /> Horário
+              </button>
+              <button
+                type="button"
+                onClick={() => setReminderType('location')}
+                className={`flex items-center justify-center gap-1.5 py-2 text-xs rounded-xl font-medium border transition-all ${reminderType === 'location' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 font-bold' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}
+              >
+                <MapPin size={14} /> Local
+              </button>
+            </div>
           </div>
 
-          {reminderType === 'location' && (
-            <div className="p-3.5 bg-zinc-950/40 border border-zinc-800 rounded-2xl space-y-3">
-              <MapPicker lat={lat} lng={lng} radius={radiusMeters} onLocationChange={(nl: number, nln: number) => { setLat(nl); setLng(nln); }} />
-              <input type="range" min="50" max="1000" step="50" value={radiusMeters} onChange={(e) => setRadiusMeters(Number(e.target.value))} className="w-full accent-indigo-500" />
+          {reminderType === 'time' && (
+            <div className="p-3.5 bg-zinc-950/40 border border-zinc-800 rounded-2xl space-y-2.5 animate-in fade-in">
+              <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                <Clock size={14} className="text-indigo-400" /> Horário e Recorrência
+              </label>
+              <input 
+                type="datetime-local"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 outline-none focus:border-indigo-500"
+                value={reminderTime}
+                onChange={(e) => setReminderTime(e.target.value)}
+              />
+              <select
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 outline-none capitalize"
+                value={recurrence}
+                onChange={(e) => setRecurrence(e.target.value)}
+              >
+                <option value="none">Não repetir</option>
+                <option value="daily">Diariamente</option>
+                <option value="weekly">Semanalmente</option>
+                <option value="monthly">Mensalmente</option>
+              </select>
             </div>
           )}
 
-          <div className="p-3.5 bg-zinc-950/40 border border-zinc-800 rounded-2xl space-y-2">
-            <label className="text-xs font-semibold text-zinc-300">Checklist</label>
-            {checklist.map(item => (
-              <div key={item.id} className="flex items-center justify-between bg-zinc-900 p-2 rounded-xl text-xs">
-                <div className="flex items-center gap-2" onClick={() => toggleCheckItem(item.id)}>
-                  {item.completed ? <CheckSquare size={14} className="text-indigo-400" /> : <Square size={14} className="text-zinc-600" />}
-                  <span className={item.completed ? 'line-through text-zinc-600' : 'text-zinc-200'}>{item.text}</span>
+          {/* Seletor de Localização com Mapa Interativo e Raio Visual */}
+          {reminderType === 'location' && (
+            <div className="p-3.5 bg-zinc-950/40 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
+              <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                <MapPin size={14} className="text-indigo-400" /> Selecione o local no mapa:
+              </label>
+              
+              <MapPicker 
+                lat={lat} 
+                lng={lng} 
+                radius={radiusMeters} 
+                onLocationChange={(newLat: number, newLng: number) => { 
+                  setLat(newLat); 
+                  setLng(newLng); 
+                  setLocationName(`Lat: ${newLat.toFixed(4)}, Lng: ${newLng.toFixed(4)}`);
+                }} 
+              />
+
+              <div className="space-y-1 pt-1">
+                <div className="flex justify-between text-xs text-zinc-400">
+                  <span>Raio de alcance do alerta:</span>
+                  <strong className="text-indigo-400 font-bold">{radiusMeters} metros</strong>
                 </div>
-                <button type="button" onClick={() => removeChecklistItem(item.id)} className="text-zinc-600 hover:text-red-400">✕</button>
+                <input 
+                  type="range"
+                  min="50"
+                  max="1000"
+                  step="50"
+                  value={radiusMeters}
+                  onChange={(e) => setRadiusMeters(Number(e.target.value))}
+                  className="w-full accent-indigo-500 bg-zinc-900 cursor-pointer"
+                />
+                <span className="text-[10px] text-zinc-500 block">O círculo azul no mapa indica a área de disparo.</span>
               </div>
-            ))}
+            </div>
+          )}
+
+          {/* Checklist com Checkboxes Interativos */}
+          <div className="p-3.5 bg-zinc-950/40 border border-zinc-800/80 rounded-2xl space-y-2.5">
+            <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+              <CheckSquare size={14} className="text-indigo-400" /> Checklist (Subtarefas)
+            </label>
+            <div className="space-y-1.5 max-h-32 overflow-y-auto">
+              {checklist.map((item) => (
+                <div 
+                  key={item.id} 
+                  onClick={() => toggleCheckItem(item.id)}
+                  className="flex items-center justify-between bg-zinc-900 px-3 py-2 rounded-xl text-xs border border-zinc-800 cursor-pointer hover:border-zinc-700 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    {item.completed ? (
+                      <CheckSquare size={15} className="text-indigo-400 shrink-0" />
+                    ) : (
+                      <Square size={15} className="text-zinc-600 shrink-0" />
+                    )}
+                    <span className={item.completed ? 'line-through text-zinc-500' : 'text-zinc-200'}>
+                      {item.text}
+                    </span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setChecklist(checklist.filter(i => i.id !== item.id));
+                    }}
+                    className="text-zinc-500 hover:text-red-400 font-bold px-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
             <div className="flex gap-2">
-              <input className="flex-1 bg-zinc-900 rounded-xl p-2 text-xs text-zinc-200" value={newCheckText} onChange={e => setNewCheckText(e.target.value)} placeholder="Add item..." />
-              <button type="button" onClick={addChecklistItem} className="bg-indigo-600 text-xs text-white px-3 py-2 rounded-xl font-bold">Add</button>
+              <input 
+                type="text"
+                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none text-zinc-200 placeholder-zinc-600"
+                placeholder="Adicionar item (Ex: Mytedom 10mg)..."
+                value={newCheckText}
+                onChange={(e) => setNewCheckText(e.target.value)}
+              />
+              <button 
+                type="button" 
+                onClick={addChecklistItem}
+                className="bg-indigo-600 hover:bg-indigo-500 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-md active:scale-95 transition-all"
+              >
+                Adicionar
+              </button>
             </div>
           </div>
 
-          <button type="submit" disabled={loading} className="w-full py-4 bg-indigo-600 rounded-2xl font-bold text-xs text-white">Salvar Lembrete</button>
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold text-xs tracking-wider uppercase shadow-xl shadow-indigo-600/30 active:scale-98 transition-all disabled:opacity-50 mt-2"
+          >
+            {loading ? 'Salvando...' : (initialTask ? 'Salvar Alterações' : 'Criar Lembrete')}
+          </button>
         </form>
       </div>
     </div>
