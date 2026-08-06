@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Plus, Heart, User, Briefcase, FileText, Coffee, Bookmark, Smile, Dumbbell, Home, ShoppingBag, Car, Plane, Shield, Zap, BookOpen, Music, Code, Image as ImageIcon, Navigation } from 'lucide-react';
+import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Plus, Heart, User, Briefcase, FileText, Coffee, Bookmark, Smile, Dumbbell, Home, ShoppingBag, Car, Plane, Shield, Zap, BookOpen, Music, Code, Image as ImageIcon, Navigation, Check } from 'lucide-react';
 import { db, Task, CheckItem, Category } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { syncPushTask, syncPushCategory } from '../lib/sync';
@@ -31,9 +31,9 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   
   const [reminderType, setReminderType] = useState<'none' | 'time' | 'location'>(initialTask?.reminder_type || 'none');
   const [reminderTime, setReminderTime] = useState(initialTask?.reminder_time || '');
-  const [recurrence, setRecurrence] = useState<any>(initialTask?.recurrence || 'none');
+  const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>(initialTask?.recurrence || 'none');
   
-  const [locationName, setLocationName] = useState(initialTask?.location_name || 'Local Selecionado no Mapa');
+  const [locationName, setLocationName] = useState(initialTask?.location_name || 'Local Selecionado');
   const [lat, setLat] = useState<number | undefined>(initialTask?.lat || -18.5808);
   const [lng, setLng] = useState<number | undefined>(initialTask?.lng || -46.5181);
   const [radiusMeters, setRadiusMeters] = useState(initialTask?.radius_meters || 100);
@@ -44,8 +44,9 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   const [selectedIcon, setSelectedIcon] = useState('User');
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
 
-  // Controle das Gavetas Estilo One UI (Apenas uma aba ativa por vez)
+  // Controle das Gavetas (Estilo One UI)
   const [activeTab, setActiveTab] = useState<'none' | 'category' | 'time' | 'location' | 'attachment' | 'checklist'>('none');
+  const [isRecurrenceOpen, setIsRecurrenceOpen] = useState(false); // Sub-gaveta para recorrência customizada
 
   const [isListening, setIsListening] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -117,7 +118,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     setChecklist(checklist.map(item => item.id === id ? { ...item, completed: !item.completed } : item));
   }
 
-  // Capturar Localização Atual do GPS do Aparelho
   function handleUseCurrentLocation() {
     if (!navigator.geolocation) return alert('Geolocalização não suportada.');
     triggerHaptic('medium');
@@ -179,7 +179,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
         <div>
           {/* Topo do Modal */}
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-sm font-bold text-zinc-400 tracking-tight uppercase">
+            <h2 className="text-xs font-bold text-zinc-400 tracking-wider uppercase">
               {initialTask ? 'Editar Lembrete' : 'Adicionar Lembrete'}
             </h2>
             <div className="flex items-center gap-1.5">
@@ -210,7 +210,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               />
               <button 
                 type="button"
-                id="voice-input-trigger"
                 onClick={handleVoiceInput}
                 className={`absolute right-3 p-1.5 rounded-xl transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-zinc-400 hover:text-indigo-400'}`}
               >
@@ -266,9 +265,9 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               </button>
             </div>
 
-            {/* GAVETA 1: CATEGORIAS (Lista limpa vertical estilo Samsung) */}
+            {/* GAVETA 1: CATEGORIAS */}
             {activeTab === 'category' && (
-              <div className="p-4 bg-zinc-950/80 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
+              <div className="p-4 bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Selecionar Categoria</span>
                   <button type="button" onClick={() => setShowNewCatInput(!showNewCatInput)} className="text-xs text-indigo-400 font-bold">+ Nova</button>
@@ -296,39 +295,106 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                       className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${category === cat.name ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30' : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800'}`}
                     >
                       <span>{cat.name}</span>
-                      {category === cat.name && <span className="text-[10px] font-bold text-indigo-400">Ativo</span>}
+                      {category === cat.name && <Check size={14} className="text-indigo-400" />}
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* GAVETA 2: HORÁRIO E RECORRÊNCIA */}
+            {/* GAVETA 2: HORÁRIO E RECORRÊNCIA CUSTOMIZADOS (Sem inputs feios!) */}
             {activeTab === 'time' && (
-              <div className="p-4 bg-zinc-950/80 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Agendamento e Recorrência</span>
+              <div className="p-4 bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Agendamento de Data e Hora</span>
+                  <button 
+                    type="button" 
+                    onClick={() => setReminderTime('')}
+                    className="text-[10px] text-zinc-500 hover:text-zinc-300"
+                  >
+                    Limpar
+                  </button>
+                </div>
+
+                {/* Atalhos Rápidos Limpos */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setHours(d.getHours() + 1);
+                      setReminderTime(d.toISOString().slice(0, 16));
+                      triggerHaptic('light');
+                    }}
+                    className="py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-300 font-medium hover:border-indigo-500 transition-all"
+                  >
+                    Daqui a 1 hora
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + 1);
+                      d.setHours(8, 0, 0, 0);
+                      setReminderTime(d.toISOString().slice(0, 16));
+                      triggerHaptic('light');
+                    }}
+                    className="py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-300 font-medium hover:border-indigo-500 transition-all"
+                  >
+                    Amanhã (08:00)
+                  </button>
+                </div>
+
+                {/* Seletor Customizado de Data/Hora */}
                 <input 
                   type="datetime-local"
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 outline-none"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 outline-none focus:border-indigo-500"
                   value={reminderTime}
                   onChange={(e) => setReminderTime(e.target.value)}
                 />
-                <select
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 outline-none capitalize"
-                  value={recurrence}
-                  onChange={(e) => setRecurrence(e.target.value)}
-                >
-                  <option value="none">Não repetir</option>
-                  <option value="daily">Diariamente</option>
-                  <option value="weekly">Semanalmente</option>
-                  <option value="monthly">Mensalmente</option>
-                </select>
+
+                {/* Seletor de Recorrência Estilo Samsung (Gaveta Interna) */}
+                <div className="pt-2 border-t border-zinc-800/80">
+                  <button
+                    type="button"
+                    onClick={() => setIsRecurrenceOpen(!isRecurrenceOpen)}
+                    className="w-full flex items-center justify-between py-2 px-3 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-300 font-semibold"
+                  >
+                    <span>Repetição: <strong className="text-indigo-400 capitalize">{recurrence === 'none' ? 'Não Repetir' : recurrence}</strong></span>
+                    <span className="text-[10px] text-zinc-500">Alterar ▾</span>
+                  </button>
+
+                  {isRecurrenceOpen && (
+                    <div className="mt-2 p-2 bg-zinc-900 border border-zinc-800 rounded-xl space-y-1">
+                      {[
+                        { id: 'none', label: 'Não Repetir' },
+                        { id: 'daily', label: 'Diariamente' },
+                        { id: 'weekly', label: 'Semanalmente' },
+                        { id: 'monthly', label: 'Mensalmente' }
+                      ].map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setRecurrence(item.id as any);
+                            setIsRecurrenceOpen(false);
+                            triggerHaptic('light');
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all ${recurrence === item.id ? 'bg-indigo-600/20 text-indigo-300 font-bold' : 'text-zinc-400 hover:bg-zinc-800'}`}
+                        >
+                          <span>{item.label}</span>
+                          {recurrence === item.id && <Check size={14} className="text-indigo-400" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* GAVETA 3: LOCALIZAÇÃO E MAPA */}
+            {/* GAVETA 3: LOCALIZAÇÃO */}
             {activeTab === 'location' && (
-              <div className="p-4 bg-zinc-950/80 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
+              <div className="p-4 bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Gatilho de Localização</span>
                   <button 
@@ -336,7 +402,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                     onClick={handleUseCurrentLocation}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 rounded-xl text-xs font-bold"
                   >
-                    <Navigation size={12} /> Localização Atual
+                    <Navigation size={12} /> GPS Atual
                   </button>
                 </div>
 
@@ -344,21 +410,21 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                   lat={lat} 
                   lng={lng} 
                   radius={radiusMeters} 
-                  onLocationChange={(newLat: number, newLng: number) => { 
+                  onLocationChange={(newLat: number, newLng: number, name?: string) => { 
                     setLat(newLat); 
                     setLng(newLng); 
-                    setLocationName(`Lat: ${newLat.toFixed(4)}, Lng: ${newLng.toFixed(4)}`);
+                    if (name) setLocationName(name);
                   }} 
                 />
               </div>
             )}
 
-            {/* GAVETA 4: ANEXOS (Preparado para Nuvem) */}
+            {/* GAVETA 4: ANEXOS */}
             {activeTab === 'attachment' && (
-              <div className="p-6 text-center bg-zinc-950/80 border border-zinc-800 rounded-2xl space-y-2 animate-in fade-in">
+              <div className="p-6 text-center bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-2 animate-in fade-in">
                 <ImageIcon size={28} className="mx-auto text-indigo-400 mb-1" />
                 <p className="text-xs font-bold text-zinc-200">Anexar Arquivo ou Foto</p>
-                <p className="text-[10px] text-zinc-500">O suporte a upload sincronizado com o Supabase Storage está pronto para uso.</p>
+                <p className="text-[10px] text-zinc-500">Sincronizado automaticamente com o Supabase Storage.</p>
                 <input 
                   type="file" 
                   className="w-full text-xs text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer pt-2"
@@ -370,9 +436,9 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               </div>
             )}
 
-            {/* GAVETA 5: CHECKLIST (Subtarefas) */}
+            {/* GAVETA 5: CHECKLIST */}
             {activeTab === 'checklist' && (
-              <div className="p-4 bg-zinc-950/80 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
+              <div className="p-4 bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Checklist de Subtarefas</span>
                 <div className="space-y-1.5 max-h-28 overflow-y-auto">
                   {checklist.map((item) => (
@@ -402,7 +468,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold text-xs tracking-wider uppercase shadow-xl shadow-indigo-600/30 active:scale-98 transition-all disabled:opacity-50 mt-4"
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold text-xs tracking-wider uppercase shadow-xl shadow-indigo-600/30 active:scale-98 transition-all disabled:opacity-50 mt-4 text-white"
             >
               {loading ? 'Salvando...' : (initialTask ? 'Salvar Alterações' : 'Criar Lembrete')}
             </button>
@@ -411,7 +477,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
 
       </div>
 
-      {/* MODAL SELETOR DE ÍCONES DE CATEGORIA */}
+      {/* MODAL SELETOR DE ÍCONES */}
       {isIconPickerOpen && (
         <div className="fixed inset-0 z-60 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-5 space-y-4 shadow-2xl">
