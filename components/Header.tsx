@@ -2,12 +2,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { db } from '../lib/db';
-import { User as UserIcon, Settings, Archive, LogOut } from 'lucide-react';
+import { User as UserIcon, Settings, Archive, LogOut, Radio } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function Header() {
   const [user, setUser] = useState<any>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isTracking, setIsTracking] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -15,6 +16,10 @@ export default function Header() {
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) setUser(data.user);
     });
+
+    if (navigator.geolocation) {
+      setIsTracking(true);
+    }
 
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -42,10 +47,22 @@ export default function Header() {
   return (
     <header className="flex items-center justify-between px-6 pt-6 pb-4 bg-zinc-950/90 backdrop-blur-xl border-b border-zinc-900 sticky top-0 z-30">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-zinc-100 flex items-center gap-1.5">
-          Olá, {name} <span className="text-lg">👋</span>
-        </h1>
-        <p className="text-xs text-zinc-500 font-medium">Nexus • Gestão Inteligente</p>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold tracking-tight text-zinc-100">
+            Olá, {name}
+          </h1>
+          {/* LED de Radar (Indica Geofencing e GPS Ativo) */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800">
+            <div className="relative flex h-2 w-2">
+              {isTracking && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              )}
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${isTracking ? 'bg-emerald-500' : 'bg-zinc-600'}`}></span>
+            </div>
+            <Radio size={12} className="text-zinc-400" />
+          </div>
+        </div>
+        <p className="text-xs text-zinc-500 font-medium mt-0.5">Nexus • Gestão Inteligente</p>
       </div>
 
       <div className="relative" ref={menuRef}>
