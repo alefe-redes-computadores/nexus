@@ -1,9 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Plus, Heart, User, Briefcase, FileText, Coffee, Bookmark, Smile, Dumbbell, Home, ShoppingBag, Car, Plane, Shield, Zap, BookOpen, Music, Code, Image as ImageIcon, Navigation, Check } from 'lucide-react';
+import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Plus, Heart, User, Briefcase, FileText, Coffee, Bookmark, Smile, Dumbbell, Home, ShoppingBag, Car, Plane, Shield, Zap, BookOpen, Music, Code, Image as ImageIcon, Navigation, Check, Trash2 } from 'lucide-react';
 import { db, Task, CheckItem, Category } from '../lib/db';
 import { supabase } from '../lib/supabase';
-import { syncPushTask, syncPushCategory } from '../lib/sync';
+import { syncPushTask, syncPushCategory, uploadTaskAttachment } from '../lib/sync';
 import { triggerHaptic } from '../lib/haptics';
 import dynamic from 'next/dynamic';
 
@@ -38,15 +38,18 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   const [lng, setLng] = useState<number | undefined>(initialTask?.lng || -46.5181);
   const [radiusMeters, setRadiusMeters] = useState(initialTask?.radius_meters || 100);
 
+  // Gerenciamento de Anexos
+  const [attachments, setAttachments] = useState<any[]>(initialTask?.attachments || []);
+  const [uploadingFile, setUploadingFile] = useState(false);
+
   const [categoriesList, setCategoriesList] = useState<Category[]>([]);
   const [showNewCatInput, setShowNewCatInput] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('User');
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
 
-  // Controle das Gavetas (Estilo One UI)
   const [activeTab, setActiveTab] = useState<'none' | 'category' | 'time' | 'location' | 'attachment' | 'checklist'>('none');
-  const [isRecurrenceOpen, setIsRecurrenceOpen] = useState(false); // Sub-gaveta para recorrência customizada
+  const [isRecurrenceOpen, setIsRecurrenceOpen] = useState(false);
 
   const [isListening, setIsListening] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -118,18 +121,24 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     setChecklist(checklist.map(item => item.id === id ? { ...item, completed: !item.completed } : item));
   }
 
-  function handleUseCurrentLocation() {
-    if (!navigator.geolocation) return alert('Geolocalização não suportada.');
-    triggerHaptic('medium');
-    navigator.geolocation.getCurrentPosition((pos) => {
-      setLat(pos.coords.latitude);
-      setLng(pos.coords.longitude);
-      setReminderType('location');
-      setLocationName('Localização Atual (GPS)');
-    }, (err) => {
-      console.error(err);
-      alert('Não foi possível obter sua localização atual.');
-    });
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingFile(true);
+      triggerHaptic('medium');
+      const tempId = initialTask?.id || crypto.randomUUID();
+      const publicUrl = await uploadTaskAttachment(file, tempId);
+
+      setAttachments([...attachments, { name: file.name, url: publicUrl, type: file.type }]);
+      triggerHaptic('success');
+    } catch (err) {
+      console.error('Erro ao enviar arquivo:', err);
+      alert('Erro ao enviar o anexo para a nuvem.');
+    } finally {
+      setUploadingFile(false);
+    }
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -145,6 +154,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
       status: initialTask?.status || 'pending',
       is_important: isImportant,
       checklist,
+      attachments, // Salva os arquivos anexados na nuvem
       recurrence,
       reminder_type: reminderType,
       reminder_time: reminderType === 'time' ? reminderTime : undefined,
@@ -177,7 +187,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
       <div className="w-full max-w-lg rounded-t-[32px] sm:rounded-3xl border border-zinc-800 bg-zinc-900/95 backdrop-blur-2xl p-6 shadow-2xl animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto font-sans flex flex-col justify-between">
         
         <div>
-          {/* Topo do Modal */}
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xs font-bold text-zinc-400 tracking-wider uppercase">
               {initialTask ? 'Editar Lembrete' : 'Adicionar Lembrete'}
@@ -198,7 +207,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
           </div>
 
           <form onSubmit={handleSave} className="space-y-4">
-            {/* Input Principal de Texto */}
             <div className="relative flex items-center bg-zinc-950 border border-zinc-800 rounded-2xl px-4 py-3">
               <input 
                 autoFocus
@@ -217,7 +225,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               </button>
             </div>
 
-            {/* BARRA DE FERRAMENTAS INFERIOR (Estilo One UI - Ícones Modulares) */}
+            {/* BARRA DE FERRAMENTAS INFERIOR */}
             <div className="flex items-center justify-between border-t border-zinc-800/60 pt-3 px-2">
               <button
                 type="button"
@@ -265,14 +273,13 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               </button>
             </div>
 
-            {/* GAVETA 1: CATEGORIAS */}
+            {/* GAVETA: CATEGORIA */}
             {activeTab === 'category' && (
               <div className="p-4 bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Selecionar Categoria</span>
                   <button type="button" onClick={() => setShowNewCatInput(!showNewCatInput)} className="text-xs text-indigo-400 font-bold">+ Nova</button>
                 </div>
-
                 {showNewCatInput && (
                   <div className="space-y-2 pb-2 border-b border-zinc-800">
                     <input 
@@ -285,7 +292,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                     <button type="button" onClick={handleAddCategory} className="w-full py-2 bg-indigo-600 text-xs font-bold text-white rounded-xl">Salvar Categoria</button>
                   </div>
                 )}
-
                 <div className="space-y-1 max-h-40 overflow-y-auto">
                   {categoriesList.map((cat) => (
                     <button 
@@ -302,21 +308,13 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               </div>
             )}
 
-            {/* GAVETA 2: HORÁRIO E RECORRÊNCIA CUSTOMIZADOS (Sem inputs feios!) */}
+            {/* GAVETA: HORÁRIO E RECORRÊNCIA */}
             {activeTab === 'time' && (
               <div className="p-4 bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Agendamento de Data e Hora</span>
-                  <button 
-                    type="button" 
-                    onClick={() => setReminderTime('')}
-                    className="text-[10px] text-zinc-500 hover:text-zinc-300"
-                  >
-                    Limpar
-                  </button>
+                  <button type="button" onClick={() => setReminderTime('')} className="text-[10px] text-zinc-500 hover:text-zinc-300">Limpar</button>
                 </div>
-
-                {/* Atalhos Rápidos Limpos */}
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -344,16 +342,12 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                     Amanhã (08:00)
                   </button>
                 </div>
-
-                {/* Seletor Customizado de Data/Hora */}
                 <input 
                   type="datetime-local"
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 outline-none focus:border-indigo-500"
                   value={reminderTime}
                   onChange={(e) => setReminderTime(e.target.value)}
                 />
-
-                {/* Seletor de Recorrência Estilo Samsung (Gaveta Interna) */}
                 <div className="pt-2 border-t border-zinc-800/80">
                   <button
                     type="button"
@@ -363,7 +357,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                     <span>Repetição: <strong className="text-indigo-400 capitalize">{recurrence === 'none' ? 'Não Repetir' : recurrence}</strong></span>
                     <span className="text-[10px] text-zinc-500">Alterar ▾</span>
                   </button>
-
                   {isRecurrenceOpen && (
                     <div className="mt-2 p-2 bg-zinc-900 border border-zinc-800 rounded-xl space-y-1">
                       {[
@@ -392,20 +385,24 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               </div>
             )}
 
-            {/* GAVETA 3: LOCALIZAÇÃO */}
+            {/* GAVETA: LOCALIZAÇÃO */}
             {activeTab === 'location' && (
               <div className="p-4 bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Gatilho de Localização</span>
-                  <button 
-                    type="button" 
-                    onClick={handleUseCurrentLocation}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 rounded-xl text-xs font-bold"
-                  >
+                  <button type="button" onClick={() => {
+                    if (!navigator.geolocation) return alert('Geolocalização não suportada.');
+                    triggerHaptic('medium');
+                    navigator.geolocation.getCurrentPosition((pos) => {
+                      setLat(pos.coords.latitude);
+                      setLng(pos.coords.longitude);
+                      setReminderType('location');
+                      setLocationName('Localização Atual (GPS)');
+                    });
+                  }} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 rounded-xl text-xs font-bold">
                     <Navigation size={12} /> GPS Atual
                   </button>
                 </div>
-
                 <MapPicker 
                   lat={lat} 
                   lng={lng} 
@@ -419,24 +416,41 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               </div>
             )}
 
-            {/* GAVETA 4: ANEXOS */}
+            {/* GAVETA: ANEXOS (COM UPLOAD REAL NA NUVEM) */}
             {activeTab === 'attachment' && (
-              <div className="p-6 text-center bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-2 animate-in fade-in">
-                <ImageIcon size={28} className="mx-auto text-indigo-400 mb-1" />
-                <p className="text-xs font-bold text-zinc-200">Anexar Arquivo ou Foto</p>
-                <p className="text-[10px] text-zinc-500">Sincronizado automaticamente com o Supabase Storage.</p>
-                <input 
-                  type="file" 
-                  className="w-full text-xs text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer pt-2"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) alert(`Arquivo selecionado: ${file.name}`);
-                  }}
-                />
+              <div className="p-4 bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Arquivos e Imagens na Nuvem</span>
+                
+                {/* Lista de anexos já adicionados */}
+                {attachments.length > 0 && (
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                    {attachments.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-zinc-900 px-3 py-2 rounded-xl text-xs border border-zinc-800">
+                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-indigo-400 hover:underline truncate">
+                          <FileText size={14} /> <span className="truncate">{file.name}</span>
+                        </a>
+                        <button type="button" onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))} className="text-zinc-500 hover:text-red-400">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="text-center p-4 border border-dashed border-zinc-800 rounded-xl bg-zinc-900/40">
+                  <ImageIcon size={24} className="mx-auto text-indigo-400 mb-1" />
+                  <p className="text-xs font-bold text-zinc-200">{uploadingFile ? 'Enviando para a nuvem...' : 'Adicionar novo arquivo'}</p>
+                  <input 
+                    type="file" 
+                    disabled={uploadingFile}
+                    className="w-full text-xs text-zinc-400 file:mt-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer"
+                    onChange={handleFileUpload}
+                  />
+                </div>
               </div>
             )}
 
-            {/* GAVETA 5: CHECKLIST */}
+            {/* GAVETA: CHECKLIST */}
             {activeTab === 'checklist' && (
               <div className="p-4 bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Checklist de Subtarefas</span>
@@ -464,10 +478,9 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               </div>
             )}
 
-            {/* Botão de Conclusão Global */}
             <button 
               type="submit" 
-              disabled={loading}
+              disabled={loading || uploadingFile}
               className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold text-xs tracking-wider uppercase shadow-xl shadow-indigo-600/30 active:scale-98 transition-all disabled:opacity-50 mt-4 text-white"
             >
               {loading ? 'Salvando...' : (initialTask ? 'Salvar Alterações' : 'Criar Lembrete')}
@@ -476,41 +489,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
         </div>
 
       </div>
-
-      {/* MODAL SELETOR DE ÍCONES */}
-      {isIconPickerOpen && (
-        <div className="fixed inset-0 z-60 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-5 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center">
-              <h3 className="text-sm font-bold text-zinc-100">Escolha um Ícone</h3>
-              <button onClick={() => setIsIconPickerOpen(false)} className="p-2 text-zinc-400 hover:text-white"><X size={16} /></button>
-            </div>
-            <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
-              {ICON_CATEGORIES.map((group) => (
-                <div key={group.category} className="space-y-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">{group.category}</span>
-                  <div className="grid grid-cols-4 gap-2">
-                    {group.icons.map((IconComp: any, idx: number) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => {
-                          setSelectedIcon(group.category);
-                          setIsIconPickerOpen(false);
-                          triggerHaptic('success');
-                        }}
-                        className="p-3 bg-zinc-950 border border-zinc-800 rounded-2xl flex items-center justify-center text-zinc-300 hover:bg-indigo-600 hover:text-white transition-all"
-                      >
-                        <IconComp size={18} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
