@@ -9,6 +9,7 @@ import QuickInputBar from '../components/QuickInputBar';
 import TaskModal from '../components/TaskModal';
 import TaskCard from '../components/TaskCard';
 import ActivityClock from '../components/ActivityClock';
+import FocusModeModal from '../components/FocusModeModal';
 import { Archive, ListTodo, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -17,6 +18,7 @@ export default function Epicentro() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [view, setView] = useState<'pending' | 'archived'>('pending');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFocusOpen, setIsFocusOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   useEffect(() => {
@@ -57,12 +59,15 @@ export default function Epicentro() {
     loadTasks();
   }
 
+  // Pega a primeira tarefa pendente ou importante para a Zona de Foco
+  const priorityTask = tasks.find(t => t.status === 'pending');
+
   return (
     <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100 font-sans">
       <Header />
       
-      {/* Widget de Relógio de Atividades (Identidade Única) */}
-      <ActivityClock tasks={tasks} />
+      {/* Widget Interativo que abre a Zona de Foco */}
+      <ActivityClock tasks={tasks} onOpenFocus={() => setIsFocusOpen(true)} />
 
       {/* Painel de Comando (Navegação) */}
       <div className="px-6 mb-6">
@@ -82,7 +87,7 @@ export default function Epicentro() {
         </div>
       </div>
 
-      {/* Lista de Tarefas (Cards Inteligentes) */}
+      {/* Lista de Tarefas */}
       <div className="px-6 space-y-3">
         <AnimatePresence>
           {tasks.length === 0 ? (
@@ -115,6 +120,13 @@ export default function Epicentro() {
         onTaskCreated={loadTasks}
         userId={user?.id}
         initialTask={editingTask}
+      />
+
+      <FocusModeModal 
+        isOpen={isFocusOpen}
+        onClose={() => setIsFocusOpen(false)}
+        priorityTask={priorityTask}
+        onCompleteTask={handleCompleteTask}
       />
     </main>
   );
