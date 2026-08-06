@@ -35,7 +35,6 @@ export default function Epicentro() {
     loadTasks
   } = useTasks(user?.id);
 
-  // FASE B: Estatísticas e Sequência (Streak)
   const { completedToday, streak } = useStats(user?.id, tasks);
 
   useEffect(() => {
@@ -48,16 +47,26 @@ export default function Epicentro() {
       }
     });
     startGeofenceWatcher();
+
+    // Recupera o estado do painel de foco do Local Storage
+    const savedFocusState = localStorage.getItem('@nexus:focusPanelVisible');
+    if (savedFocusState !== null) {
+      setIsClockVisible(savedFocusState === 'true');
+    }
   }, []);
 
-  // FASE A: Atalhos de Teclado Globais (Estilo Linear)
+  // Função para salvar o estado no Local Storage sempre que alterar
+  const toggleFocusPanel = (isVisible: boolean) => {
+    setIsClockVisible(isVisible);
+    localStorage.setItem('@nexus:focusPanelVisible', String(isVisible));
+  };
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // Ignora se o usuário estiver digitando dentro de um input ou textarea
       const target = e.target as HTMLElement;
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
         if (e.key === 'Escape') {
-          target.blur(); // Sai do foco do input ao apertar Esc
+          target.blur();
         }
         return;
       }
@@ -85,17 +94,15 @@ export default function Epicentro() {
     <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100 font-sans">
       <Header />
       
-      {/* FASE B: Painel de Estatísticas Gamificado */}
       <StatsPanel completedToday={completedToday} streak={streak} />
       
-      {/* Widget de Foco Moderno (Sem card duplo espremido) */}
       <div className="px-6 mt-4">
         {isClockVisible ? (
           <div className="relative">
             <div className="flex justify-between items-center mb-2 px-1">
               <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Painel de Imersão</span>
               <button 
-                onClick={() => setIsClockVisible(false)}
+                onClick={() => toggleFocusPanel(false)}
                 className="text-[10px] font-semibold text-zinc-400 hover:text-zinc-200 transition-colors flex items-center gap-1"
               >
                 <EyeOff size={12} /> Ocultar
@@ -107,7 +114,7 @@ export default function Epicentro() {
         ) : (
           <div className="flex justify-end mb-2">
             <button 
-              onClick={() => setIsClockVisible(true)}
+              onClick={() => toggleFocusPanel(true)}
               className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1 px-1"
             >
               <Eye size={12} /> Exibir Painel de Foco
@@ -116,7 +123,6 @@ export default function Epicentro() {
         )}
       </div>
 
-      {/* Barra de Título e Pesquisa Rápida */}
       <div className="px-6 mt-6 mb-4 flex items-center justify-between">
         <h2 className="text-xs font-bold tracking-widest uppercase text-zinc-500">
           Atividades Ativas ({totalActive})
@@ -133,7 +139,6 @@ export default function Epicentro() {
         </div>
       </div>
 
-      {/* Input de Pesquisa Expansível */}
       {isSearchOpen && (
         <div className="px-6 mb-4 animate-in fade-in">
           <div className="relative flex items-center bg-zinc-900 border border-zinc-800 rounded-2xl px-3 py-2">
@@ -155,7 +160,6 @@ export default function Epicentro() {
         </div>
       )}
 
-      {/* Lista Dividida por Prazos (Passado, Hoje, Próximos) */}
       <div className="px-6 space-y-6">
         <AnimatePresence>
           {totalActive === 0 ? (
@@ -168,7 +172,6 @@ export default function Epicentro() {
             </motion.div>
           ) : (
             <>
-              {/* SEÇÃO PASSADO / ATRASADO */}
               {categorizedTasks.past.length > 0 && (
                 <div className="space-y-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-red-400">Passado / Atrasados</span>
@@ -185,7 +188,6 @@ export default function Epicentro() {
                 </div>
               )}
 
-              {/* SEÇÃO HOJE */}
               {categorizedTasks.today.length > 0 && (
                 <div className="space-y-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Hoje</span>
@@ -202,7 +204,6 @@ export default function Epicentro() {
                 </div>
               )}
 
-              {/* SEÇÃO PRÓXIMOS / FUTURO */}
               {categorizedTasks.upcoming.length > 0 && (
                 <div className="space-y-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Próximos dias</span>
