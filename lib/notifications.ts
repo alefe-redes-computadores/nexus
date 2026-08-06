@@ -33,7 +33,7 @@ function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lo
   return R * c; // Distância exata em metros
 }
 
-// Monitor de localização em segundo plano
+// Monitor de localização em segundo plano com Otimização de Carga
 export function startGeofenceWatcher() {
   if (!navigator.geolocation) return;
 
@@ -42,12 +42,19 @@ export function startGeofenceWatcher() {
       const userLat = pos.coords.latitude;
       const userLng = pos.coords.longitude;
 
-      // Busca todas as tarefas pendentes cadastradas com local
-      const tasks = await db.tasks.where('status').equals('pending').toArray();
-      const locationTasks = tasks.filter(t => t.reminder_type === 'location' && t.lat && t.lng);
+      // Otimização: Busca apenas tarefas pendentes que possuem gatilho de local
+      const locationTasks = await db.tasks
+        .where('reminder_type')
+        .equals('location')
+        .and(t => t.status === 'pending')
+        .toArray();
+
+      if (locationTasks.length === 0) return; // Evita processamento desnecessário se não houver metas de local
 
       for (const task of locationTasks) {
-        const distance = calculateHaversineDistance(userLat, userLng, task.lat!, task.lng!);
+        if (!task.lat || !task.lng) continue;
+        
+        const distance = calculateHaversineDistance(userLat, userLng, task.lat, task.lng);
         const maxRadius = task.radius_meters || 100;
 
         if (distance <= maxRadius && !task.notified) {
@@ -56,7 +63,7 @@ export function startGeofenceWatcher() {
             `Você está a ${Math.round(distance)}m de ${task.location_name || 'um local cadastrado'}.`
           );
 
-          // Marca como notificado para não ficar disparando repetidamente
+          // Marca como notificado para evitar disparos repetidos
           if (task.id) {
             await db.tasks.update(task.id, { notified: true });
           }
