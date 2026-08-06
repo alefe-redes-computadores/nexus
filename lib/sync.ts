@@ -1,76 +1,59 @@
 import { supabase } from './supabase';
-import { db, Task } from './db';
+import { db, Task, Category } from './db';
 
-// Inicializa a sincronização automática em tempo real
 export function initAutoSync(userId: string, onDataChanged: () => void) {
   if (!userId) return;
 
-  // 1. Sincronização inicial ao abrir o app
+  // Puxa tudo da nuvem ao iniciar
   syncPull(userId).then(onDataChanged);
 
-  // 2. Canal de Realtime do Supabase (Ouvindo mudanças na nuvem)
-  const channel = supabase
+  // Canal em tempo real para Tasks
+  const tasksChannel = supabase
     .channel('public:tasks')
     .on(
       'postgres_changes',
-      {
-        event: '*', // Escuta INSERT, UPDATE, DELETE
-        schema: 'public',
-        table: 'tasks',
-        filter: `user_id=eq.${userId}`,
-      },
+      { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${userId}` },
       async (payload) => {
-        const remoteTask = payload.new as Task;
         if (payload.eventType === 'DELETE') {
           await db.tasks.delete(payload.old.id);
-        } else if (remoteTask) {
-          // Atualiza o banco local com o que veio da nuvem
-          await db.tasks.put(remoteTask);
+        } else {
+          await db.tasks.put(payload.new as Task);
         }
         onDataChanged();
       }
     )
     .subscribe();
 
-  // Retorna a função para fechar o canal se necessário
-  return () => {
-    supabase.removeChannel(channel);
+  return () => { 
+    supabase.removeChannel(tasksChannel); 
   };
 }
 
-// Função de puxar dados (Pull)
 export async function syncPull(userId: string) {
-  try {
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('user_id', userId);
-
-    if (error) throw error;
-
-    if (data) {
-      for (const task of data) {
-        await db.tasks.put(task);
-      }
+  // 1. Sincroniza Tarefas
+  const { data: tasksData } = await supabase.from('tasks').select('*').eq('user_id', userId);
+  if (tasksData) {
+    for (const task of tasksData) {
+      await db.tasks.put(task);
     }
-  } catch (err) {
-    console.error('Erro no Auto-Sync Pull:', err);
+  }
+
+  // 2. Sincroniza Categorias (compartilhadas ou por usuário)
+  const { data: catsData } = await supabase.from('categories').select('*');
+  if (catsData) {
+    for (const cat of catsData) {
+      await db.categories.put(cat);
+    }
   }
 }
 
-// Função de empurrar dados (Push imediato para cada ação)
 export async function syncPushTask(task: Task) {
-  try {
-    // Grava localmente primeiro (Local-First)
-    if (!task.id) {
-      task.id = crypto.randomUUID();
-    }
-    await db.tasks.put(task);
+  if (!task.id) task.id = crypto.randomUUID();
+  await db.tasks.put(task);
+  await supabase.from('tasks').upsert([task]);
+}
 
-    // Envia para a nuvem em background
-    const { error } = await supabase.from('tasks').upsert([task]);
-    if (error) throw error;
-  } catch (err) {
-    console.error('Erro no Auto-Sync Push (salvo offline localmente):', err);
-  }
+export async function syncPushCategory(category: Category) {
+  await db.categories.put(category);
+  await supabase.from('categories').upsert([category]);
 }
