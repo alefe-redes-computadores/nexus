@@ -1,55 +1,76 @@
-import { db, Task } from './db';
 import { supabase } from './supabase';
+import { db, Task } from './db';
 
-export async function fullSyncWithCloud(userId: string): Promise<{ success: boolean; message: string }> {
-  if (!userId) return { success: false, message: 'Usuário não autenticado.' };
+// Inicializa a sincronização automática em tempo real
+export function initAutoSync(userId: string, onDataChanged: () => void) {
+  if (!userId) return;
 
+  // 1. Sincronização inicial ao abrir o app
+  syncPull(userId).then(onDataChanged);
+
+  // 2. Canal de Realtime do Supabase (Ouvindo mudanças na nuvem)
+  const channel = supabase
+    .channel('public:tasks')
+    .on(
+      'postgres_changes',
+      {
+        event: '*', // Escuta INSERT, UPDATE, DELETE
+        schema: 'public',
+        table: 'tasks',
+        filter: `user_id=eq.${userId}`,
+      },
+      async (payload) => {
+        const remoteTask = payload.new as Task;
+        if (payload.eventType === 'DELETE') {
+          await db.tasks.delete(payload.old.id);
+        } else if (remoteTask) {
+          // Atualiza o banco local com o que veio da nuvem
+          await db.tasks.put(remoteTask);
+        }
+        onDataChanged();
+      }
+    )
+    .subscribe();
+
+  // Retorna a função para fechar o canal se necessário
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+// Função de puxar dados (Pull)
+export async function syncPull(userId: string) {
   try {
-    // 1. Baixar tudo do Supabase para o dispositivo (essencial pós-reinstalação)
-    const { data: remoteTasks, error } = await supabase
+    const { data, error } = await supabase
       .from('tasks')
       .select('*')
       .eq('user_id', userId);
 
     if (error) throw error;
 
-    if (remoteTasks && remoteTasks.length > 0) {
-      // Atualiza ou insere as tarefas remotas no banco local (Dexie)
-      await db.transaction('rw', db.tasks, async () => {
-        for (const rTask of remoteTasks) {
-          const localTask = await db.tasks.get(rTask.id);
-          if (!localTask) {
-            await db.tasks.put(rTask);
-          } else {
-            // Preserva a versão mais recente
-            await db.tasks.put({ ...localTask, ...rTask });
-          }
-        }
-      });
-    }
-
-    // 2. Enviar para a nuvem tarefas criadas localmente que ainda não foram enviadas
-    const localTasks = await db.tasks.where('user_id').equals(userId).toArray();
-    const unsyncedTasks = localTasks.filter(t => !t.id || typeof t.id === 'number');
-
-    for (const task of unsyncedTasks) {
-      const { id, ...taskData } = task; // Remove ID numérico temporário do Dexie
-      const { data: inserted, error: insertErr } = await supabase
-        .from('tasks')
-        .insert([{ ...taskData, user_id: userId }])
-        .select()
-        .single();
-
-      if (!insertErr && inserted) {
-        // Substitui o registro temporário local pelo definitivo do Supabase
-        await db.tasks.delete(task.id!);
-        await db.tasks.put(inserted);
+    if (data) {
+      for (const task of data) {
+        await db.tasks.put(task);
       }
     }
+  } catch (err) {
+    console.error('Erro no Auto-Sync Pull:', err);
+  }
+}
 
-    return { success: true, message: 'Sincronização concluída com sucesso!' };
-  } catch (err: any) {
-    console.error('Erro na sincronização:', err);
-    return { success: false, message: err.message || 'Falha ao sincronizar.' };
+// Função de empurrar dados (Push imediato para cada ação)
+export async function syncPushTask(task: Task) {
+  try {
+    // Grava localmente primeiro (Local-First)
+    if (!task.id) {
+      task.id = crypto.randomUUID();
+    }
+    await db.tasks.put(task);
+
+    // Envia para a nuvem em background
+    const { error } = await supabase.from('tasks').upsert([task]);
+    if (error) throw error;
+  } catch (err) {
+    console.error('Erro no Auto-Sync Push (salvo offline localmente):', err);
   }
 }
