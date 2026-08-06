@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, User, Briefcase, FileText, Coffee, Bookmark, Smile, Dumbbell, Home, ShoppingBag, Car, Plane, Shield, Zap, BookOpen, Music, Code, Image as ImageIcon, Navigation, Check, Trash2, Edit2, Eye } from 'lucide-react';
+import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, User, Briefcase, FileText, Coffee, Bookmark, Check, Trash2, Edit2, Eye, Tag, ImageIcon, Navigation } from 'lucide-react';
 import { db, Task, CheckItem, Category } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { syncPushTask, syncPushCategory, uploadTaskAttachment } from '../lib/sync';
@@ -24,6 +24,10 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   const [checklist, setChecklist] = useState<CheckItem[]>(initialTask?.checklist || []);
   const [newCheckText, setNewCheckText] = useState('');
   
+  // FASE C: Gerenciamento de Tags Dinâmicas
+  const [tags, setTags] = useState<string[]>(initialTask?.tags || []);
+  const [newTag, setNewTag] = useState('');
+  
   const [reminderType, setReminderType] = useState<'none' | 'time' | 'location'>(initialTask?.reminder_type || 'none');
   const [reminderTime, setReminderTime] = useState(initialTask?.reminder_time || '');
   const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>(initialTask?.recurrence || 'none');
@@ -45,7 +49,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   const [newCatName, setNewCatName] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('User');
 
-  const [activeTab, setActiveTab] = useState<'none' | 'category' | 'time' | 'location' | 'attachment' | 'checklist'>('none');
+  const [activeTab, setActiveTab] = useState<'none' | 'category' | 'time' | 'location' | 'attachment' | 'checklist' | 'tags'>('none');
   const [isRecurrenceOpen, setIsRecurrenceOpen] = useState(false);
 
   const [isListening, setIsListening] = useState(false);
@@ -117,7 +121,15 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     setChecklist(checklist.map(item => item.id === id ? { ...item, completed: !item.completed } : item));
   }
 
-  // Remove a extensão do nome para exibição limpa
+  // FASE C: Função para adicionar Tags Dinâmicas
+  function addTag() {
+    const cleanTag = newTag.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+    if (!cleanTag || tags.includes(cleanTag)) return;
+    triggerHaptic('light');
+    setTags([...tags, cleanTag]);
+    setNewTag('');
+  }
+
   function stripExtension(filename: string) {
     return filename.replace(/\.[^/.]+$/, '');
   }
@@ -132,7 +144,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
       const tempId = initialTask?.id || crypto.randomUUID();
       const publicUrl = await uploadTaskAttachment(file, tempId);
 
-      // Salva o nome sem extensão por padrão
       const cleanName = stripExtension(file.name);
 
       setAttachments([...attachments, { 
@@ -152,7 +163,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   function saveAttachmentName(index: number) {
     if (!tempCustomName.trim()) return;
     const updated = [...attachments];
-    // Garante que o nome customizado não traga extensões acidentais digitadas pelo usuário
     updated[index].name = stripExtension(tempCustomName.trim());
     setAttachments(updated);
     setEditingAttachmentIndex(null);
@@ -174,6 +184,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
       is_important: isImportant,
       checklist,
       attachments, 
+      tags, // Adicionando as tags ao banco de dados
       recurrence,
       reminder_type: reminderType,
       reminder_time: reminderType === 'time' ? reminderTime : undefined,
@@ -244,8 +255,8 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               </button>
             </div>
 
-            {/* BARRA DE FERRAMENTAS INFERIOR */}
-            <div className="flex items-center justify-between border-t border-zinc-800/60 pt-3 px-2">
+            {/* BARRA DE FERRAMENTAS INFERIOR ATUALIZADA COM TAGS */}
+            <div className="flex items-center justify-between border-t border-zinc-800/60 pt-3 px-1">
               <button
                 type="button"
                 onClick={() => { triggerHaptic('light'); setActiveTab(activeTab === 'category' ? 'none' : 'category'); }}
@@ -253,6 +264,15 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                 title="Categoria"
               >
                 <User size={18} />
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => { triggerHaptic('light'); setActiveTab(activeTab === 'tags' ? 'none' : 'tags'); }}
+                className={`p-2.5 rounded-xl transition-all ${activeTab === 'tags' ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'}`}
+                title="Tags"
+              >
+                <Tag size={18} />
               </button>
 
               <button
@@ -291,6 +311,44 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                 <CheckSquare size={18} />
               </button>
             </div>
+
+            {/* GAVETA: TAGS DINÂMICAS */}
+            {activeTab === 'tags' && (
+              <div className="p-4 bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Etiquetas (Tags)</span>
+                
+                {/* Lista de Tags Adicionadas */}
+                <div className="flex flex-wrap gap-2 mb-1">
+                  {tags.map((t) => (
+                    <span key={t} className="flex items-center gap-1 px-2 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 rounded-lg text-[10px] font-bold">
+                      #{t}
+                      <button type="button" onClick={() => setTags(tags.filter(tag => tag !== t))} className="hover:text-red-400 transition-colors ml-1">
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                  {tags.length === 0 && <span className="text-xs text-zinc-600 italic">Nenhuma tag...</span>}
+                </div>
+                
+                {/* Input de Nova Tag */}
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none text-zinc-200 placeholder-zinc-600"
+                    placeholder="Ex: urgente, projeto-x, cliente..."
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addTag();
+                      }
+                    }}
+                  />
+                  <button type="button" onClick={addTag} className="bg-indigo-600 px-3 py-2 rounded-xl text-xs font-bold text-white">Criar</button>
+                </div>
+              </div>
+            )}
 
             {/* GAVETA: CATEGORIA */}
             {activeTab === 'category' && (
