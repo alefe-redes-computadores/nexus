@@ -5,12 +5,14 @@ import { db, Task } from '../lib/db';
 import { initAutoSync } from '../lib/sync';
 import { startGeofenceWatcher } from '../lib/notifications';
 import { useTasks } from '../hooks/useTasks';
+import { useStats } from '../hooks/useStats';
 import Header from '../components/Header';
 import QuickInputBar from '../components/QuickInputBar';
 import TaskModal from '../components/TaskModal';
 import TaskCard from '../components/TaskCard';
 import ActivityClock from '../components/ActivityClock';
 import FocusModeModal from '../components/FocusModeModal';
+import StatsPanel from '../components/StatsPanel';
 import { CheckCircle2, Search, X, EyeOff, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -32,6 +34,9 @@ export default function Epicentro() {
     handleToggleCheck,
     loadTasks
   } = useTasks(user?.id);
+
+  // FASE B: Estatísticas e Sequência (Streak)
+  const { completedToday, streak } = useStats(user?.id, tasks);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -79,6 +84,9 @@ export default function Epicentro() {
   return (
     <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100 font-sans">
       <Header />
+      
+      {/* FASE B: Painel de Estatísticas Gamificado */}
+      <StatsPanel completedToday={completedToday} streak={streak} />
       
       {/* Widget de Foco Moderno (Sem card duplo espremido) */}
       <div className="px-6 mt-4">
