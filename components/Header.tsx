@@ -68,18 +68,23 @@ export default function Header() {
       <div className="relative shrink-0" ref={menuRef}>
         <button 
           onClick={() => setMenuOpen(!menuOpen)}
-          className="focus:outline-none transition-transform active:scale-95 block"
+          className="focus:outline-none transition-transform active:scale-95 block relative"
         >
-          {avatar ? (
+          {/* Fallback com a inicial do usuário caso a foto demore ou falhe */}
+          <div className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0">
+            <span className="text-xs font-bold text-indigo-400">{name.charAt(0).toUpperCase()}</span>
+          </div>
+
+          {/* Imagem do Perfil por cima do fallback (se existir URL) */}
+          {avatar && (
             <img 
               src={avatar} 
               alt="Perfil" 
-              className="w-10 h-10 rounded-full border-2 border-indigo-500/50 object-cover shadow-md shrink-0"
+              className="absolute inset-0 w-10 h-10 rounded-full border-2 border-indigo-500/50 object-cover shadow-md shrink-0"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
+              }}
             />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0">
-              <UserIcon size={18} />
-            </div>
           )}
         </button>
 
