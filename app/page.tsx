@@ -2,12 +2,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { db, Task } from '../lib/db';
+import { initAutoSync } from '../lib/sync';
 import { startGeofenceWatcher } from '../lib/notifications';
 import Header from '../components/Header';
 import QuickInputBar from '../components/QuickInputBar';
 import TaskModal from '../components/TaskModal';
 import TaskCard from '../components/TaskCard';
-import { Calendar, Archive, CheckCircle2, ListTodo } from 'lucide-react';
+import { Archive, ListTodo, CheckCircle2 } from 'lucide-react';
 
 export default function Epicentro() {
   const [user, setUser] = useState<any>(null);
@@ -17,7 +18,16 @@ export default function Epicentro() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setUser(data.session?.user));
+    supabase.auth.getSession().then(({ data }) => {
+      const u = data.session?.user;
+      setUser(u);
+      if (u) {
+        // Injetando a sincronização automática aqui:
+        // O initAutoSync vai ouvir o Realtime do Supabase e chamar loadTasks automaticamente
+        const cleanup = initAutoSync(u.id, loadTasks);
+        return () => cleanup?.();
+      }
+    });
     loadTasks();
     startGeofenceWatcher();
   }, [view]);
@@ -28,7 +38,11 @@ export default function Epicentro() {
   }
 
   async function handleCompleteTask(id: string) {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
     const newStatus = view === 'pending' ? 'archived' : 'pending';
+    
+    // Atualiza local e nuvem via sincronização
     await db.tasks.update(id, { status: newStatus });
     await supabase.from('tasks').update({ status: newStatus }).eq('id', id);
     loadTasks();
@@ -80,14 +94,14 @@ export default function Epicentro() {
               key={task.id} 
               task={task} 
               onComplete={handleCompleteTask} 
-              onEdit={(t) => { setEditingTask(t); setIsModalOpen(true); }} 
+              onEdit={(t: Task) => { setEditingTask(t); setIsModalOpen(true); }} 
               onToggleCheck={handleToggleCheck}
             />
           ))
         )}
       </div>
 
-      {/* Input Fixado no Rodapé (Estilo Samsung) */}
+      {/* Input Fixado no Rodapé */}
       <QuickInputBar onClick={() => { setEditingTask(null); setIsModalOpen(true); }} />
 
       <TaskModal 
