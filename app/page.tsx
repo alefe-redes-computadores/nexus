@@ -1,18 +1,19 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { db } from '../lib/db';
+import { db, Task } from '../lib/db';
 import Header from '../components/Header';
 import Navbar from '../components/Navbar';
 import TaskModal from '../components/TaskModal';
 import TaskCard from '../components/TaskCard';
-import { Briefcase, User, Heart } from 'lucide-react';
+import { Calendar, Star, Heart, User, Briefcase, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function Epicentro() {
   const [user, setUser] = useState<any>(null);
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activePillar, setActivePillar] = useState<string>('all');
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [activeFilter, setActiveFilter] = useState<string>('all');
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
@@ -31,76 +32,122 @@ export default function Epicentro() {
     }
   }
 
-  // Função para concluir/arquivar a tarefa (Local-First)
   async function handleCompleteTask(id: string) {
     try {
-      // 1. Atualiza localmente no Dexie (some da tela instantaneamente)
       await db.tasks.update(id, { status: 'archived' });
       setTasks(prev => prev.filter(t => t.id !== id));
-
-      // 2. Atualiza no Supabase em background
       await supabase.from('tasks').update({ status: 'archived' }).eq('id', id);
     } catch (err) {
-      console.error('Erro ao arquivar tarefa:', err);
+      console.error('Erro ao arquivar:', err);
     }
   }
 
-  const filteredTasks = activePillar === 'all' 
-    ? tasks 
-    : tasks.filter(t => t.pillar === activePillar);
+  // Filtragem baseada nos tiles da Samsung
+  const filteredTasks = tasks.filter(task => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'important') return task.is_important;
+    return task.category === activeFilter;
+  });
 
   return (
-    <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100">
+    <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100 font-sans selection:bg-indigo-500">
       <Header user={user} />
       
-      {/* Filtros de Pilares */}
-      <div className="px-6 mb-6 flex gap-2 overflow-x-auto no-scrollbar">
-        <button 
-          onClick={() => setActivePillar('all')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activePillar === 'all' ? 'bg-zinc-200 text-zinc-950' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}`}
-        >
-          Todos
-        </button>
-        <button 
-          onClick={() => setActivePillar('empresa')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activePillar === 'empresa' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}`}
-        >
-          <Briefcase size={14} /> Empresa
-        </button>
-        <button 
-          onClick={() => setActivePillar('pessoal')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activePillar === 'pessoal' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}`}
-        >
-          <User size={14} /> Pessoal
-        </button>
-        <button 
-          onClick={() => setActivePillar('saude')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activePillar === 'saude' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}`}
-        >
-          <Heart size={14} /> Saúde
-        </button>
+      {/* Dashboard Tiles (Estilo Samsung Reminder) */}
+      <div className="px-6 mb-6">
+        <div className="grid grid-cols-3 gap-2.5">
+          
+          {/* Tile: Todos / Hoje */}
+          <button 
+            onClick={() => setActiveFilter('all')}
+            className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between h-24 ${activeFilter === 'all' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200' : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-300 hover:border-zinc-700'}`}
+          >
+            <div className="flex justify-between items-center w-full">
+              <Calendar size={18} className="text-indigo-400" />
+              <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-zinc-800/80">{tasks.length}</span>
+            </div>
+            <span className="text-xs font-semibold tracking-wide">Geral</span>
+          </button>
+
+          {/* Tile: Importantes */}
+          <button 
+            onClick={() => setActiveFilter('important')}
+            className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between h-24 ${activeFilter === 'important' ? 'bg-amber-500/20 border-amber-500 text-amber-200' : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-300 hover:border-zinc-700'}`}
+          >
+            <div className="flex justify-between items-center w-full">
+              <Star size={18} className="text-amber-400" />
+              <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-zinc-800/80">{tasks.filter(t => t.is_important).length}</span>
+            </div>
+            <span className="text-xs font-semibold tracking-wide">Importantes</span>
+          </button>
+
+          {/* Tile: Saúde */}
+          <button 
+            onClick={() => setActiveFilter('saude')}
+            className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between h-24 ${activeFilter === 'saude' ? 'bg-rose-500/20 border-rose-500 text-rose-200' : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-300 hover:border-zinc-700'}`}
+          >
+            <div className="flex justify-between items-center w-full">
+              <Heart size={18} className="text-rose-400" />
+              <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-zinc-800/80">{tasks.filter(t => t.category === 'saude').length}</span>
+            </div>
+            <span className="text-xs font-semibold tracking-wide">Saúde</span>
+          </button>
+
+        </div>
+
+        {/* Linha secundária de categorias rápidas */}
+        <div className="flex gap-2 mt-2.5 overflow-x-auto no-scrollbar">
+          {['pessoal', 'vencimentos', 'lanchonete', 'pagamentos', 'estudos'].map((cat) => {
+            const count = tasks.filter(t => t.category === cat).length;
+            return (
+              <button
+                key={cat}
+                onClick={() => setActiveFilter(cat)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium capitalize shrink-0 border transition-all ${activeFilter === cat ? 'bg-zinc-200 text-zinc-950 border-white font-bold' : 'bg-zinc-900/40 text-zinc-400 border-zinc-800'}`}
+              >
+                {cat} ({count})
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Lista de Tarefas */}
+      {/* Lista de Tarefas Estilizada */}
       <div className="px-6 space-y-3">
+        <div className="flex justify-between items-center mb-1">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+            {activeFilter === 'all' ? 'Todas as Tarefas' : `Filtro: ${activeFilter}`}
+          </h3>
+          {activeFilter !== 'all' && (
+            <button onClick={() => setActiveFilter('all')} className="text-xs text-indigo-400 font-semibold">Limpar Filtro</button>
+          )}
+        </div>
+
         {filteredTasks.length === 0 ? (
-          <div className="text-center py-16 text-zinc-600 text-sm">
-            Nenhuma tarefa pendente neste pilar.
+          <div className="text-center py-16 border border-dashed border-zinc-800/80 rounded-3xl bg-zinc-900/20">
+            <CheckCircle2 size={32} className="mx-auto text-zinc-700 mb-2" />
+            <p className="text-zinc-500 text-sm">Nenhum lembrete encontrado aqui.</p>
           </div>
         ) : (
           filteredTasks.map(task => (
-            <TaskCard key={task.id} task={task} onComplete={handleCompleteTask} />
+            <TaskCard 
+              key={task.id} 
+              task={task} 
+              onComplete={handleCompleteTask} 
+              onEdit={(t) => { setEditingTask(t); setIsModalOpen(true); }} 
+            />
           ))
         )}
       </div>
 
-      <Navbar onAddTask={() => setIsModalOpen(true)} />
+      <Navbar onAddTask={() => { setEditingTask(null); setIsModalOpen(true); }} />
 
       <TaskModal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        onClose={() => { setIsModalOpen(false); setEditingTask(null); }} 
         onTaskCreated={loadLocalAndSync}
         userId={user?.id}
+        initialTask={editingTask}
       />
     </main>
   );
