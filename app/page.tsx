@@ -7,117 +7,76 @@ import Header from '../components/Header';
 import QuickInputBar from '../components/QuickInputBar';
 import TaskModal from '../components/TaskModal';
 import TaskCard from '../components/TaskCard';
-import { Calendar, Star, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Archive, ListTodo } from 'lucide-react';
 
-export default function Epicentro() {
+export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [view, setView] = useState<'pending' | 'archived'>('pending');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [activeFilter, setActiveFilter] = useState<string>('all');
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
-    loadLocalAndSync();
+    supabase.auth.getSession().then(({ data }) => setUser(data.session?.user));
+    loadTasks();
     startGeofenceWatcher();
-  }, []);
+  }, [view]); // Recarrega sempre que mudar entre Pendente/Arquivado
 
-  async function loadLocalAndSync() {
-    const localTasks = await db.tasks.where('status').equals('pending').toArray();
+  async function loadTasks() {
+    // Busca do banco local com base no filtro da aba
+    const localTasks = await db.tasks.where('status').equals(view).toArray();
     setTasks(localTasks);
-
-    const { data: remoteTasks } = await supabase.from('tasks').select('*').eq('status', 'pending');
-    if (remoteTasks) {
-      await db.tasks.clear();
-      await db.tasks.bulkAdd(remoteTasks);
-      setTasks(remoteTasks);
-    }
   }
 
   async function handleCompleteTask(id: string) {
-    try {
-      await db.tasks.update(id, { status: 'archived' });
-      setTasks(prev => prev.filter(t => t.id !== id));
-      await supabase.from('tasks').update({ status: 'archived' }).eq('id', id);
-    } catch (err) {
-      console.error('Erro ao arquivar:', err);
-    }
+    const newStatus = view === 'pending' ? 'archived' : 'pending';
+    await db.tasks.update(id, { status: newStatus });
+    await supabase.from('tasks').update({ status: newStatus }).eq('id', id);
+    loadTasks();
   }
 
   async function handleToggleCheck(taskId: string, checkId: string) {
     const task = tasks.find(t => t.id === taskId);
     if (!task || !task.checklist) return;
-
     const updatedChecklist = task.checklist.map(item => 
       item.id === checkId ? { ...item, completed: !item.completed } : item
     );
-
-    setTasks(tasks.map(t => t.id === taskId ? { ...t, checklist: updatedChecklist } : t));
     await db.tasks.update(taskId, { checklist: updatedChecklist });
     await supabase.from('tasks').update({ checklist: updatedChecklist }).eq('id', taskId);
+    loadTasks();
   }
-
-  const filteredTasks = tasks.filter(task => {
-    if (activeFilter === 'all') return true;
-    if (activeFilter === 'important') return task.is_important;
-    return task.category === activeFilter;
-  });
 
   return (
     <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100 font-sans">
       <Header />
       
-      {/* Dashboard Tiles */}
-      <div className="px-6 mb-6 pt-3">
-        <div className="grid grid-cols-2 gap-3 mb-3">
+      {/* Abas de Navegação (Substitui menu inferior) */}
+      <div className="px-6 mt-4 mb-6">
+        <div className="flex bg-zinc-900/50 p-1 rounded-2xl border border-zinc-800">
           <button 
-            onClick={() => setActiveFilter('all')}
-            className={`p-4 rounded-3xl border text-left transition-all flex flex-col justify-between h-28 ${activeFilter === 'all' ? 'bg-indigo-600/25 border-indigo-500 text-indigo-200 shadow-xl shadow-indigo-600/10' : 'bg-zinc-900/40 border-zinc-800/80 text-zinc-300'}`}
+            onClick={() => setView('pending')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold transition-all ${view === 'pending' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500'}`}
           >
-            <div className="flex justify-between items-center w-full">
-              <Calendar size={20} className="text-indigo-400" />
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-zinc-800">{tasks.length}</span>
-            </div>
-            <div>
-              <span className="text-sm font-bold block">Todos</span>
-              <span className="text-[10px] text-zinc-500">Geral</span>
-            </div>
+            <ListTodo size={16} /> Pendentes
           </button>
-
           <button 
-            onClick={() => setActiveFilter('important')}
-            className={`p-4 rounded-3xl border text-left transition-all flex flex-col justify-between h-28 ${activeFilter === 'important' ? 'bg-amber-500/25 border-amber-500 text-amber-200 shadow-xl shadow-amber-500/10' : 'bg-zinc-900/40 border-zinc-800/80 text-zinc-300'}`}
+            onClick={() => setView('archived')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold transition-all ${view === 'archived' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500'}`}
           >
-            <div className="flex justify-between items-center w-full">
-              <Star size={20} className="text-amber-400" />
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-zinc-800">{tasks.filter(t => t.is_important).length}</span>
-            </div>
-            <div>
-              <span className="text-sm font-bold block">Importantes</span>
-              <span className="text-[10px] text-zinc-500">Destaques</span>
-            </div>
+            <Archive size={16} /> Arquivados
           </button>
         </div>
       </div>
 
-      {/* Lista de Lembretes */}
+      {/* Lista de Tarefas */}
       <div className="px-6 space-y-3">
-        <div className="flex justify-between items-center mb-1 px-1">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-            {activeFilter === 'all' ? 'Lembretes Pendentes' : `Filtro: ${activeFilter}`}
-          </h3>
-          {activeFilter !== 'all' && (
-            <button onClick={() => setActiveFilter('all')} className="text-xs text-indigo-400 font-semibold">Ver Todos</button>
-          )}
-        </div>
-
-        {filteredTasks.length === 0 ? (
+        {tasks.length === 0 ? (
           <div className="text-center py-20 border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20">
             <CheckCircle2 size={36} className="mx-auto text-zinc-700 mb-2" />
-            <p className="text-zinc-500 text-sm font-medium">Nenhum lembrete por aqui.</p>
+            <p className="text-zinc-500 text-sm font-medium">Nenhum lembrete nesta aba.</p>
           </div>
         ) : (
-          filteredTasks.map(task => (
+          tasks.map(task => (
             <TaskCard 
               key={task.id} 
               task={task} 
@@ -129,13 +88,13 @@ export default function Epicentro() {
         )}
       </div>
 
-      {/* Barra de Input Compacta Estilo Samsung */}
+      {/* Input Flutuante Estilo Samsung */}
       <QuickInputBar onClick={() => { setEditingTask(null); setIsModalOpen(true); }} />
 
       <TaskModal 
         isOpen={isModalOpen} 
         onClose={() => { setIsModalOpen(false); setEditingTask(null); }} 
-        onTaskCreated={loadLocalAndSync}
+        onTaskCreated={loadTasks}
         userId={user?.id}
         initialTask={editingTask}
       />
