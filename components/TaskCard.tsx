@@ -59,10 +59,19 @@ export default function TaskCard({ task, sectionType, onComplete, onEdit, onTogg
                 <h3 className="font-semibold text-sm text-zinc-100">{task.title}</h3>
                 {task.is_important && <Star size={14} className="text-amber-400 fill-amber-400" />}
               </div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">{task.category}</span>
+              
+              {/* FASE C: Categorias e Tags Dinâmicas renderizadas lado a lado */}
+              <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
+                <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mr-1">{task.category}</span>
+                
+                {task.tags && task.tags.map((tag: string) => (
+                  <span key={tag} className="px-1.5 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[8px] font-bold tracking-wider uppercase">
+                    #{tag}
+                  </span>
+                ))}
+
                 {task.reminder_time && (
-                  <span className="text-[10px] text-zinc-400">
+                  <span className="text-[10px] text-zinc-400 ml-1">
                     • {new Date(task.reminder_time).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às {new Date(task.reminder_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 )}
