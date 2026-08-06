@@ -45,6 +45,34 @@ export default function Epicentro() {
     startGeofenceWatcher();
   }, []);
 
+  // FASE A: Atalhos de Teclado Globais (Estilo Linear)
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Ignora se o usuário estiver digitando dentro de um input ou textarea
+      const target = e.target as HTMLElement;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
+        if (e.key === 'Escape') {
+          target.blur(); // Sai do foco do input ao apertar Esc
+        }
+        return;
+      }
+
+      if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault();
+        setEditingTask(null);
+        setIsModalOpen(true);
+      } else if (e.key === 'Escape') {
+        setIsModalOpen(false);
+        setIsFocusOpen(false);
+        setIsSearchOpen(false);
+        setEditingTask(null);
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const priorityTask = tasks.find(t => t.status === 'pending');
   const totalActive = tasks.length;
 
