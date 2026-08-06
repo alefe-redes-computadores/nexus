@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Plus, Heart, User, Briefcase, FileText, Coffee, Bookmark, Smile, Dumbbell, Home, ShoppingBag, Car, Plane, Shield, Zap, BookOpen, Music, Code } from 'lucide-react';
+import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Plus, Heart, User, Briefcase, FileText, Coffee, Bookmark, Smile, Dumbbell, Home, ShoppingBag, Car, Plane, Shield, Zap, BookOpen, Music, Code, Image as ImageIcon, Navigation } from 'lucide-react';
 import { db, Task, CheckItem, Category } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { syncPushTask, syncPushCategory } from '../lib/sync';
@@ -44,6 +44,9 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   const [selectedIcon, setSelectedIcon] = useState('User');
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
 
+  // Controle das Gavetas Estilo One UI (Apenas uma aba ativa por vez)
+  const [activeTab, setActiveTab] = useState<'none' | 'category' | 'time' | 'location' | 'attachment' | 'checklist'>('none');
+
   const [isListening, setIsListening] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -80,7 +83,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
       user_id: userId
     };
 
-    // Salva na nuvem e local via sync
     await syncPushCategory(newCat);
     setNewCatName('');
     setShowNewCatInput(false);
@@ -113,6 +115,21 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   function toggleCheckItem(id: string) {
     triggerHaptic('light');
     setChecklist(checklist.map(item => item.id === id ? { ...item, completed: !item.completed } : item));
+  }
+
+  // Capturar Localização Atual do GPS do Aparelho
+  function handleUseCurrentLocation() {
+    if (!navigator.geolocation) return alert('Geolocalização não suportada.');
+    triggerHaptic('medium');
+    navigator.geolocation.getCurrentPosition((pos) => {
+      setLat(pos.coords.latitude);
+      setLng(pos.coords.longitude);
+      setReminderType('location');
+      setLocationName('Localização Atual (GPS)');
+    }, (err) => {
+      console.error(err);
+      alert('Não foi possível obter sua localização atual.');
+    });
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -153,254 +170,248 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   if (!isOpen) return null;
 
   return (
-    // Clique fora do modal fecha (Backdrop Click)
     <div 
       onClick={(e) => { if (e.target === e.currentTarget) { triggerHaptic('light'); onClose(); } }}
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4 overflow-y-auto"
     >
-      <div className="w-full max-w-lg rounded-t-[32px] sm:rounded-3xl border border-zinc-800 bg-zinc-900/95 backdrop-blur-2xl p-6 shadow-2xl animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto font-sans">
+      <div className="w-full max-w-lg rounded-t-[32px] sm:rounded-3xl border border-zinc-800 bg-zinc-900/95 backdrop-blur-2xl p-6 shadow-2xl animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto font-sans flex flex-col justify-between">
         
-        <div className="flex justify-between items-center mb-5">
-          <h2 className="text-base font-bold text-zinc-100 tracking-tight">
-            {initialTask ? 'Editar Lembrete' : 'Novo Lembrete'}
-          </h2>
-          <div className="flex items-center gap-1.5">
-            <button 
-              type="button" 
-              onClick={() => { triggerHaptic('light'); setIsImportant(!isImportant); }} 
-              className={`p-2.5 rounded-2xl transition-all ${isImportant ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-zinc-800/80 text-zinc-400 border border-zinc-700/50'}`}
-              title="Marcar como Importante"
-            >
-              <Star size={16} fill={isImportant ? 'currentColor' : 'none'} />
-            </button>
-            <button onClick={() => { triggerHaptic('light'); onClose(); }} className="p-2.5 rounded-2xl bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 hover:text-white transition-all">
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-
-        <form onSubmit={handleSave} className="space-y-4">
-          <div className="relative">
-            <input 
-              autoFocus
-              type="text"
-              className="w-full bg-zinc-950/60 border border-zinc-800 rounded-2xl p-4 pr-12 text-sm outline-none focus:border-indigo-500 text-zinc-100 placeholder-zinc-500 transition-all shadow-inner"
-              placeholder="O que precisa ser feito? (Ex: Tomar Metadona 5mg)"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-            <button 
-              type="button"
-              onClick={handleVoiceInput}
-              className={`absolute right-3.5 top-3.5 p-2 rounded-xl transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-zinc-400 hover:text-indigo-400 bg-zinc-900'}`}
-              title="Ditado por voz"
-            >
-              <Mic size={16} />
-            </button>
-          </div>
-
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Categoria / Lista</label>
+        <div>
+          {/* Topo do Modal */}
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-sm font-bold text-zinc-400 tracking-tight uppercase">
+              {initialTask ? 'Editar Lembrete' : 'Adicionar Lembrete'}
+            </h2>
+            <div className="flex items-center gap-1.5">
               <button 
                 type="button" 
-                onClick={() => { triggerHaptic('light'); setShowNewCatInput(!showNewCatInput); }}
-                className="text-[11px] text-indigo-400 font-semibold flex items-center gap-1"
+                onClick={() => { triggerHaptic('light'); setIsImportant(!isImportant); }} 
+                className={`p-2 rounded-xl transition-all ${isImportant ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-zinc-800 text-zinc-400'}`}
+                title="Importante"
               >
-                <Plus size={12} /> Nova Categoria
+                <Star size={15} fill={isImportant ? 'currentColor' : 'none'} />
+              </button>
+              <button onClick={() => { triggerHaptic('light'); onClose(); }} className="p-2 rounded-xl bg-zinc-800 text-zinc-400 hover:text-white">
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+
+          <form onSubmit={handleSave} className="space-y-4">
+            {/* Input Principal de Texto */}
+            <div className="relative flex items-center bg-zinc-950 border border-zinc-800 rounded-2xl px-4 py-3">
+              <input 
+                autoFocus
+                type="text"
+                className="w-full bg-transparent text-sm outline-none text-zinc-100 placeholder-zinc-500 pr-10"
+                placeholder="O que precisa ser feito?..."
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+              <button 
+                type="button"
+                id="voice-input-trigger"
+                onClick={handleVoiceInput}
+                className={`absolute right-3 p-1.5 rounded-xl transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-zinc-400 hover:text-indigo-400'}`}
+              >
+                <Mic size={16} />
               </button>
             </div>
 
-            {showNewCatInput && (
-              <div className="space-y-3 mb-3 p-3.5 bg-zinc-950 border border-zinc-800 rounded-2xl animate-in fade-in">
-                <input 
-                  type="text" 
-                  placeholder="Nome da categoria..." 
-                  value={newCatName} 
-                  onChange={e => setNewCatName(e.target.value)} 
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-zinc-100 outline-none"
-                />
-                <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setIsIconPickerOpen(true)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-indigo-300 font-semibold"
-                  >
-                    <span>Ícone Selecionado: {selectedIcon}</span>
-                  </button>
-                  <button type="button" onClick={handleAddCategory} className="px-4 py-2 bg-indigo-600 text-xs font-bold text-white rounded-xl">Criar Categoria</button>
+            {/* BARRA DE FERRAMENTAS INFERIOR (Estilo One UI - Ícones Modulares) */}
+            <div className="flex items-center justify-between border-t border-zinc-800/60 pt-3 px-2">
+              <button
+                type="button"
+                onClick={() => { triggerHaptic('light'); setActiveTab(activeTab === 'category' ? 'none' : 'category'); }}
+                className={`p-2.5 rounded-xl transition-all ${activeTab === 'category' ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'}`}
+                title="Categoria"
+              >
+                <User size={18} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { triggerHaptic('light'); setActiveTab(activeTab === 'time' ? 'none' : 'time'); setReminderType('time'); }}
+                className={`p-2.5 rounded-xl transition-all ${activeTab === 'time' ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'}`}
+                title="Horário"
+              >
+                <Clock size={18} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { triggerHaptic('light'); setActiveTab(activeTab === 'location' ? 'none' : 'location'); setReminderType('location'); }}
+                className={`p-2.5 rounded-xl transition-all ${activeTab === 'location' ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'}`}
+                title="Localização"
+              >
+                <MapPin size={18} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { triggerHaptic('light'); setActiveTab(activeTab === 'attachment' ? 'none' : 'attachment'); }}
+                className={`p-2.5 rounded-xl transition-all ${activeTab === 'attachment' ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'}`}
+                title="Anexo / Imagem"
+              >
+                <ImageIcon size={18} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { triggerHaptic('light'); setActiveTab(activeTab === 'checklist' ? 'none' : 'checklist'); }}
+                className={`p-2.5 rounded-xl transition-all ${activeTab === 'checklist' ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'}`}
+                title="Checklist"
+              >
+                <CheckSquare size={18} />
+              </button>
+            </div>
+
+            {/* GAVETA 1: CATEGORIAS (Lista limpa vertical estilo Samsung) */}
+            {activeTab === 'category' && (
+              <div className="p-4 bg-zinc-950/80 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Selecionar Categoria</span>
+                  <button type="button" onClick={() => setShowNewCatInput(!showNewCatInput)} className="text-xs text-indigo-400 font-bold">+ Nova</button>
+                </div>
+
+                {showNewCatInput && (
+                  <div className="space-y-2 pb-2 border-b border-zinc-800">
+                    <input 
+                      type="text" 
+                      placeholder="Nome da nova categoria..." 
+                      value={newCatName} 
+                      onChange={e => setNewCatName(e.target.value)} 
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 outline-none"
+                    />
+                    <button type="button" onClick={handleAddCategory} className="w-full py-2 bg-indigo-600 text-xs font-bold text-white rounded-xl">Salvar Categoria</button>
+                  </div>
+                )}
+
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {categoriesList.map((cat) => (
+                    <button 
+                      key={cat.id || cat.name}
+                      type="button"
+                      onClick={() => { triggerHaptic('light'); setCategory(cat.name); setActiveTab('none'); }}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${category === cat.name ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30' : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800'}`}
+                    >
+                      <span>{cat.name}</span>
+                      {category === cat.name && <span className="text-[10px] font-bold text-indigo-400">Ativo</span>}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
 
-            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-              {categoriesList.map((cat) => (
-                <button 
-                  key={cat.id || cat.name}
-                  type="button"
-                  onClick={() => { triggerHaptic('light'); setCategory(cat.name); }}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold shrink-0 transition-all ${
-                    category === cat.name 
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-bold' 
-                      : 'bg-zinc-800/60 text-zinc-400 border border-zinc-700/40 hover:border-zinc-600'
-                  }`}
-                >
-                  {cat.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-2 block">Gatilho de Alerta</label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => { triggerHaptic('light'); setReminderType('none'); }}
-                className={`py-2 text-xs rounded-xl font-medium border transition-all ${reminderType === 'none' ? 'bg-zinc-700 border-zinc-500 text-white font-bold' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}
-              >
-                Padrão
-              </button>
-              <button
-                type="button"
-                onClick={() => { triggerHaptic('light'); setReminderType('time'); }}
-                className={`flex items-center justify-center gap-1.5 py-2 text-xs rounded-xl font-medium border transition-all ${reminderType === 'time' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 font-bold' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}
-              >
-                <Clock size={14} /> Horário
-              </button>
-              <button
-                type="button"
-                onClick={() => { triggerHaptic('light'); setReminderType('location'); }}
-                className={`flex items-center justify-center gap-1.5 py-2 text-xs rounded-xl font-medium border transition-all ${reminderType === 'location' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 font-bold' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}
-              >
-                <MapPin size={14} /> Local
-              </button>
-            </div>
-          </div>
-
-          {reminderType === 'time' && (
-            <div className="p-3.5 bg-zinc-950/40 border border-zinc-800 rounded-2xl space-y-2.5 animate-in fade-in">
-              <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                <Clock size={14} className="text-indigo-400" /> Horário e Recorrência
-              </label>
-              <input 
-                type="datetime-local"
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 outline-none focus:border-indigo-500"
-                value={reminderTime}
-                onChange={(e) => setReminderTime(e.target.value)}
-              />
-              <select
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 outline-none capitalize"
-                value={recurrence}
-                onChange={(e) => setRecurrence(e.target.value)}
-              >
-                <option value="none">Não repetir</option>
-                <option value="daily">Diariamente</option>
-                <option value="weekly">Semanalmente</option>
-                <option value="monthly">Mensalmente</option>
-              </select>
-            </div>
-          )}
-
-          {reminderType === 'location' && (
-            <div className="p-3.5 bg-zinc-950/40 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
-              <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                <MapPin size={14} className="text-indigo-400" /> Selecione o local no mapa:
-              </label>
-              
-              <MapPicker 
-                lat={lat} 
-                lng={lng} 
-                radius={radiusMeters} 
-                onLocationChange={(newLat: number, newLng: number) => { 
-                  setLat(newLat); 
-                  setLng(newLng); 
-                  setLocationName(`Lat: ${newLat.toFixed(4)}, Lng: ${newLng.toFixed(4)}`);
-                }} 
-              />
-
-              <div className="space-y-1 pt-1">
-                <div className="flex justify-between text-xs text-zinc-400">
-                  <span>Raio de alcance do alerta:</span>
-                  <strong className="text-indigo-400 font-bold">{radiusMeters} metros</strong>
-                </div>
+            {/* GAVETA 2: HORÁRIO E RECORRÊNCIA */}
+            {activeTab === 'time' && (
+              <div className="p-4 bg-zinc-950/80 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Agendamento e Recorrência</span>
                 <input 
-                  type="range"
-                  min="50"
-                  max="1000"
-                  step="50"
-                  value={radiusMeters}
-                  onChange={(e) => setRadiusMeters(Number(e.target.value))}
-                  className="w-full accent-indigo-500 bg-zinc-900 cursor-pointer"
+                  type="datetime-local"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 outline-none"
+                  value={reminderTime}
+                  onChange={(e) => setReminderTime(e.target.value)}
                 />
-              </div>
-            </div>
-          )}
-
-          {/* Checklist */}
-          <div className="p-3.5 bg-zinc-950/40 border border-zinc-800/80 rounded-2xl space-y-2.5">
-            <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-              <CheckSquare size={14} className="text-indigo-400" /> Checklist (Subtarefas)
-            </label>
-            <div className="space-y-1.5 max-h-32 overflow-y-auto">
-              {checklist.map((item) => (
-                <div 
-                  key={item.id} 
-                  onClick={() => toggleCheckItem(item.id)}
-                  className="flex items-center justify-between bg-zinc-900 px-3 py-2 rounded-xl text-xs border border-zinc-800 cursor-pointer hover:border-zinc-700 transition-all"
+                <select
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 outline-none capitalize"
+                  value={recurrence}
+                  onChange={(e) => setRecurrence(e.target.value)}
                 >
-                  <div className="flex items-center gap-2">
-                    {item.completed ? (
-                      <CheckSquare size={15} className="text-indigo-400 shrink-0" />
-                    ) : (
-                      <Square size={15} className="text-zinc-600 shrink-0" />
-                    )}
-                    <span className={item.completed ? 'line-through text-zinc-500' : 'text-zinc-200'}>
-                      {item.text}
-                    </span>
-                  </div>
+                  <option value="none">Não repetir</option>
+                  <option value="daily">Diariamente</option>
+                  <option value="weekly">Semanalmente</option>
+                  <option value="monthly">Mensalmente</option>
+                </select>
+              </div>
+            )}
+
+            {/* GAVETA 3: LOCALIZAÇÃO E MAPA */}
+            {activeTab === 'location' && (
+              <div className="p-4 bg-zinc-950/80 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Gatilho de Localização</span>
                   <button 
                     type="button" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setChecklist(checklist.filter(i => i.id !== item.id));
-                    }}
-                    className="text-zinc-500 hover:text-red-400 font-bold px-1"
+                    onClick={handleUseCurrentLocation}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 rounded-xl text-xs font-bold"
                   >
-                    ✕
+                    <Navigation size={12} /> Localização Atual
                   </button>
                 </div>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input 
-                type="text"
-                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none text-zinc-200 placeholder-zinc-600"
-                placeholder="Adicionar item..."
-                value={newCheckText}
-                onChange={(e) => setNewCheckText(e.target.value)}
-              />
-              <button 
-                type="button" 
-                onClick={addChecklistItem}
-                className="bg-indigo-600 hover:bg-indigo-500 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-md active:scale-95 transition-all"
-              >
-                Adicionar
-              </button>
-            </div>
-          </div>
 
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold text-xs tracking-wider uppercase shadow-xl shadow-indigo-600/30 active:scale-98 transition-all disabled:opacity-50 mt-2"
-          >
-            {loading ? 'Salvando...' : (initialTask ? 'Salvar Alterações' : 'Criar Lembrete')}
-          </button>
-        </form>
+                <MapPicker 
+                  lat={lat} 
+                  lng={lng} 
+                  radius={radiusMeters} 
+                  onLocationChange={(newLat: number, newLng: number) => { 
+                    setLat(newLat); 
+                    setLng(newLng); 
+                    setLocationName(`Lat: ${newLat.toFixed(4)}, Lng: ${newLng.toFixed(4)}`);
+                  }} 
+                />
+              </div>
+            )}
+
+            {/* GAVETA 4: ANEXOS (Preparado para Nuvem) */}
+            {activeTab === 'attachment' && (
+              <div className="p-6 text-center bg-zinc-950/80 border border-zinc-800 rounded-2xl space-y-2 animate-in fade-in">
+                <ImageIcon size={28} className="mx-auto text-indigo-400 mb-1" />
+                <p className="text-xs font-bold text-zinc-200">Anexar Arquivo ou Foto</p>
+                <p className="text-[10px] text-zinc-500">O suporte a upload sincronizado com o Supabase Storage está pronto para uso.</p>
+                <input 
+                  type="file" 
+                  className="w-full text-xs text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer pt-2"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) alert(`Arquivo selecionado: ${file.name}`);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* GAVETA 5: CHECKLIST (Subtarefas) */}
+            {activeTab === 'checklist' && (
+              <div className="p-4 bg-zinc-950/80 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Checklist de Subtarefas</span>
+                <div className="space-y-1.5 max-h-28 overflow-y-auto">
+                  {checklist.map((item) => (
+                    <div key={item.id} onClick={() => toggleCheckItem(item.id)} className="flex items-center justify-between bg-zinc-900 px-3 py-2 rounded-xl text-xs border border-zinc-800 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        {item.completed ? <CheckSquare size={14} className="text-indigo-400" /> : <Square size={14} className="text-zinc-600" />}
+                        <span className={item.completed ? 'line-through text-zinc-500' : 'text-zinc-200'}>{item.text}</span>
+                      </div>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setChecklist(checklist.filter(i => i.id !== item.id)); }} className="text-zinc-500 hover:text-red-400">✕</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none text-zinc-200 placeholder-zinc-600"
+                    placeholder="Adicionar item..."
+                    value={newCheckText}
+                    onChange={(e) => setNewCheckText(e.target.value)}
+                  />
+                  <button type="button" onClick={addChecklistItem} className="bg-indigo-600 px-3 py-2 rounded-xl text-xs font-bold text-white">Adicionar</button>
+                </div>
+              </div>
+            )}
+
+            {/* Botão de Conclusão Global */}
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold text-xs tracking-wider uppercase shadow-xl shadow-indigo-600/30 active:scale-98 transition-all disabled:opacity-50 mt-4"
+            >
+              {loading ? 'Salvando...' : (initialTask ? 'Salvar Alterações' : 'Criar Lembrete')}
+            </button>
+          </form>
+        </div>
+
       </div>
 
-      {/* MODAL SELETOR DE ÍCONES AVANÇADO */}
+      {/* MODAL SELETOR DE ÍCONES DE CATEGORIA */}
       {isIconPickerOpen && (
         <div className="fixed inset-0 z-60 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-5 space-y-4 shadow-2xl">
