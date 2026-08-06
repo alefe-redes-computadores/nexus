@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Mic, Plus, Pill, Briefcase, User, BookOpen, X } from 'lucide-react';
+import { Mic, Plus, Briefcase, User, BookOpen, X, Bookmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { triggerHaptic } from '../lib/haptics';
 
@@ -8,10 +8,10 @@ export default function QuickInputBar({ onClick }: { onClick: () => void }) {
   const [showMenu, setShowMenu] = useState(false);
 
   const categories = [
-    { name: 'Saúde', icon: Pill },
-    { name: 'Trabalho', icon: Briefcase },
     { name: 'Pessoal', icon: User },
-    { name: 'Estudos', icon: BookOpen }
+    { name: 'Trabalho', icon: Briefcase },
+    { name: 'Estudos', icon: BookOpen },
+    { name: 'Geral', icon: Bookmark }
   ];
 
   return (
@@ -20,13 +20,13 @@ export default function QuickInputBar({ onClick }: { onClick: () => void }) {
         {showMenu && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-24 left-6 right-6 z-40 bg-zinc-900 border border-zinc-800 rounded-3xl p-4 shadow-2xl flex justify-between"
+            className="fixed bottom-24 left-6 right-6 z-40 max-w-lg mx-auto bg-zinc-900 border border-zinc-800 rounded-3xl p-4 shadow-2xl flex justify-between"
           >
             {categories.map((cat) => (
               <button 
                 key={cat.name} 
                 onClick={() => { triggerHaptic('light'); setShowMenu(false); onClick(); }}
-                className="flex flex-col items-center gap-2 text-zinc-400 hover:text-indigo-400"
+                className="flex flex-col items-center gap-2 text-zinc-400 hover:text-indigo-400 transition-colors"
               >
                 <cat.icon size={20} />
                 <span className="text-[9px] font-bold uppercase">{cat.name}</span>
@@ -47,7 +47,7 @@ export default function QuickInputBar({ onClick }: { onClick: () => void }) {
             </div>
             <span className="text-xs font-medium text-zinc-400">Adicionar lembrete...</span>
           </div>
-          <button className="p-2.5 text-zinc-400 hover:text-indigo-400 transition-all">
+          <button onClick={() => triggerHaptic('light')} className="p-2.5 text-zinc-400 hover:text-indigo-400 transition-all">
             <Mic size={18} />
           </button>
         </div>
