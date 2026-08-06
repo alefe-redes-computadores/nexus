@@ -19,7 +19,7 @@ export default function Epicentro() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFocusOpen, setIsFocusOpen] = useState(false);
-  const [isClockVisible, setIsClockVisible] = useState(true); // Permite minimizar o relógio de foco
+  const [isClockVisible, setIsClockVisible] = useState(true); // Permite ocultar o painel de foco
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   useEffect(() => {
@@ -82,30 +82,29 @@ export default function Epicentro() {
     <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100 font-sans">
       <Header />
       
-      {/* Widget de Atividades / Zona de Foco com opção de minimizar */}
-      {isClockVisible && (
-        <div className="relative">
-          <ActivityClock tasks={tasks} onOpenFocus={() => setIsFocusOpen(true)} />
-          <button 
-            onClick={() => setIsClockVisible(false)}
-            className="absolute top-3 right-8 text-[10px] text-zinc-500 hover:text-zinc-300 uppercase tracking-widest font-bold"
-          >
-            Minimizar
-          </button>
-        </div>
-      )}
-
-      {/* Se o relógio estiver minimizado, exibe um botão discreto para reabri-lo */}
-      {!isClockVisible && (
-        <div className="px-6 mt-4">
+      {/* Widget de Atividades / Zona de Foco Colapsável com Padrão de Elite */}
+      <div className="px-6 mt-4">
+        {isClockVisible ? (
+          <div className="relative bg-zinc-900/40 border border-zinc-800/80 rounded-3xl p-1 backdrop-blur-xl shadow-xl transition-all">
+            <ActivityClock tasks={tasks} onOpenFocus={() => setIsFocusOpen(true)} />
+            <div className="flex justify-end px-4 pb-2">
+              <button 
+                onClick={() => setIsClockVisible(false)}
+                className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                Ocultar Painel
+              </button>
+            </div>
+          </div>
+        ) : (
           <button 
             onClick={() => setIsClockVisible(true)}
-            className="text-[10px] uppercase tracking-widest text-indigo-400 font-bold bg-indigo-950/30 border border-indigo-500/20 px-4 py-2 rounded-xl"
+            className="w-full py-3 bg-zinc-900/40 border border-zinc-800/60 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-indigo-400 transition-all flex items-center justify-center gap-2 shadow-sm"
           >
-            + Exibir Painel de Foco
+            <span>+ Exibir Zona de Foco</span>
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Título de Seção Limpo */}
       <div className="px-6 mt-6 mb-4 flex items-center justify-between">
