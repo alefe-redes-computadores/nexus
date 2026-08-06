@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase';
 import { db, Task } from '../lib/db';
 import { startGeofenceWatcher } from '../lib/notifications';
 import Header from '../components/Header';
-import Navbar from '../components/Navbar';
 import QuickInputBar from '../components/QuickInputBar';
 import TaskModal from '../components/TaskModal';
 import TaskCard from '../components/TaskCard';
@@ -45,7 +44,6 @@ export default function Epicentro() {
     }
   }
 
-  // Função para marcar/desmarcar o checklist direto no card
   async function handleToggleCheck(taskId: string, checkId: string) {
     const task = tasks.find(t => t.id === taskId);
     if (!task || !task.checklist) return;
@@ -66,11 +64,11 @@ export default function Epicentro() {
   });
 
   return (
-    <main className="min-h-screen bg-zinc-950 pb-36 text-zinc-100 font-sans">
-      <Header user={user} />
+    <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100 font-sans">
+      <Header />
       
       {/* Dashboard Tiles */}
-      <div className="px-6 mb-6 pt-2">
+      <div className="px-6 mb-6 pt-3">
         <div className="grid grid-cols-2 gap-3 mb-3">
           <button 
             onClick={() => setActiveFilter('all')}
@@ -131,11 +129,8 @@ export default function Epicentro() {
         )}
       </div>
 
-      {/* Barra de Input Estilo Samsung */}
+      {/* Barra de Input Compacta Estilo Samsung */}
       <QuickInputBar onClick={() => { setEditingTask(null); setIsModalOpen(true); }} />
-
-      {/* Navbar Minimalista Inferior */}
-      <Navbar />
 
       <TaskModal 
         isOpen={isModalOpen} 
