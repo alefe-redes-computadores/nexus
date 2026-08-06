@@ -1,5 +1,5 @@
 'use client';
-import { LayoutGrid, Archive, Plus } from 'lucide-react';
+import { LayoutGrid, Archive, Plus, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function Navbar({ onAddTask }: { onAddTask: () => void }) {
@@ -11,6 +11,7 @@ export default function Navbar({ onAddTask }: { onAddTask: () => void }) {
         <Plus size={28} className="text-white" />
       </button>
       <button onClick={() => router.push('/archive')} className="text-zinc-500 hover:text-indigo-400"><Archive size={24} /></button>
+      <button onClick={() => router.push('/settings')} className="text-zinc-500 hover:text-indigo-400"><Settings size={24} /></button>
     </nav>
   );
 }
