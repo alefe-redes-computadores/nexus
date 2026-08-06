@@ -1,16 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from './lib/supabase';
-import { db, Task } from './lib/db';
-import { initAutoSync } from './lib/sync';
-import { startGeofenceWatcher } from './lib/notifications';
-import { useTasks } from './hooks/useTasks';
-import Header from './components/Header';
-import QuickInputBar from './components/QuickInputBar';
-import TaskModal from './components/TaskModal';
-import TaskCard from './components/TaskCard';
-import ActivityClock from './components/ActivityClock';
-import FocusModeModal from './components/FocusModeModal';
+import { supabase } from '../lib/supabase';
+import { db, Task } from '../lib/db';
+import { initAutoSync } from '../lib/sync';
+import { startGeofenceWatcher } from '../lib/notifications';
+import { useTasks } from '../hooks/useTasks';
+import Header from '../components/Header';
+import QuickInputBar from '../components/QuickInputBar';
+import TaskModal from '../components/TaskModal';
+import TaskCard from '../components/TaskCard';
+import ActivityClock from '../components/ActivityClock';
+import FocusModeModal from '../components/FocusModeModal';
 import { CheckCircle2, Search, X, EyeOff, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -56,7 +56,6 @@ export default function Epicentro() {
       <div className="px-6 mt-4">
         {isClockVisible ? (
           <div className="relative">
-            {/* Linha de controle minimalista estilo app moderno */}
             <div className="flex justify-between items-center mb-2 px-1">
               <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Painel de Imersão</span>
               <button 
