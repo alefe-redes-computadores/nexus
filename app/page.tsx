@@ -1,71 +1,97 @@
 // app/page.tsx
 'use client';
 
-import Link from 'next/link';
-import { Briefcase, User, HeartPulse, Sparkles } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '../lib/supabase';
+import { Briefcase, User, Activity, LogOut } from 'lucide-react';
 
 export default function HomePage() {
-  const pillars = [
-    {
-      title: 'Empresa',
-      description: 'Tarefas corporativas, prazos e documentos.',
-      href: '/empresa',
-      icon: Briefcase,
-      color: 'from-blue-500/20 to-indigo-500/20 border-blue-500/30 text-blue-400',
-    },
-    {
-      title: 'Pessoal',
-      description: 'Rotinas diárias, compras e metas rápidas.',
-      href: '/pessoal',
-      icon: User,
-      color: 'from-emerald-500/20 to-teal-500/20 border-emerald-500/30 text-emerald-400',
-    },
-    {
-      title: 'Saúde',
-      description: 'Medicamentos, receitas e consultas médicas.',
-      href: '/saude',
-      icon: HeartPulse,
-      color: 'from-rose-500/20 to-pink-500/20 border-rose-500/30 text-rose-400',
-    },
-  ];
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+
+  // Verifica se o usuário está logado ao abrir o app
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        // Se não tiver sessão, manda pro login
+        router.push('/login');
+      } else {
+        // Se estiver logado, libera a tela
+        setLoading(false);
+      }
+    };
+    
+    checkUser();
+  }, [router]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
+
+  // Tela de carregamento enquanto verifica a segurança
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[80vh]">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-8 my-auto">
-      <header className="flex flex-col gap-2">
-        <div className="flex items-center gap-2 text-indigo-400 text-sm font-medium">
-          <Sparkles className="w-4 h-4" />
-          <span>Nexus Local-First Ativo</span>
+    <div className="flex flex-col gap-6 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      
+      <header className="flex items-center justify-between mt-2">
+        <div>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Sua Rotina</h1>
+          <p className="text-zinc-400 text-sm mt-1">O que vamos focar hoje?</p>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight text-white">Sua Rotina Unificada</h1>
-        <p className="text-zinc-400 text-sm">Selecione um pilar para gerenciar suas tarefas e contextos.</p>
+        <button 
+          onClick={handleLogout}
+          className="p-3 bg-zinc-900/80 border border-zinc-800 rounded-2xl text-zinc-400 hover:text-rose-400 transition-colors"
+        >
+          <LogOut className="w-5 h-5" />
+        </button>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {pillars.map((pillar, index) => {
-          const Icon = pillar.icon;
-          return (
-            <motion.div
-              key={pillar.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <Link
-                href={pillar.href}
-                className={`flex flex-col gap-4 p-5 rounded-2xl border bg-gradient-to-br ${pillar.color} backdrop-blur-xl transition-all hover:scale-[1.02] active:scale-[0.98]`}
-              >
-                <div className="p-3 w-fit rounded-xl bg-zinc-900/60 border border-white/10">
-                  <Icon className="w-6 h-6" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-white">{pillar.title}</h2>
-                  <p className="text-xs text-zinc-400 mt-1">{pillar.description}</p>
-                </div>
-              </Link>
-            </motion.div>
-          );
-        })}
+      <div className="grid grid-cols-1 gap-4 mt-4">
+        
+        {/* Card Empresa */}
+        <button className="flex items-center gap-4 p-5 bg-zinc-900/80 border border-zinc-800/80 rounded-3xl hover:bg-zinc-800/80 transition-all text-left">
+          <div className="p-4 bg-indigo-500/10 rounded-2xl text-indigo-400">
+            <Briefcase className="w-7 h-7" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-zinc-100">Empresa</h2>
+            <p className="text-sm text-zinc-500 mt-1">Tarefas corporativas e prazos</p>
+          </div>
+        </button>
+
+        {/* Card Pessoal */}
+        <button className="flex items-center gap-4 p-5 bg-zinc-900/80 border border-zinc-800/80 rounded-3xl hover:bg-zinc-800/80 transition-all text-left">
+          <div className="p-4 bg-emerald-500/10 rounded-2xl text-emerald-400">
+            <User className="w-7 h-7" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-zinc-100">Pessoal</h2>
+            <p className="text-sm text-zinc-500 mt-1">Rotinas diárias e metas</p>
+          </div>
+        </button>
+
+        {/* Card Saúde */}
+        <button className="flex items-center gap-4 p-5 bg-zinc-900/80 border border-zinc-800/80 rounded-3xl hover:bg-zinc-800/80 transition-all text-left">
+          <div className="p-4 bg-rose-500/10 rounded-2xl text-rose-400">
+            <Activity className="w-7 h-7" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-zinc-100">Saúde</h2>
+            <p className="text-sm text-zinc-500 mt-1">Medicamentos e consultas</p>
+          </div>
+        </button>
+
       </div>
     </div>
   );
