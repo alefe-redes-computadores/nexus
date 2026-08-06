@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { db, Task } from '../lib/db';
 import { initAutoSync } from '../lib/sync';
@@ -39,6 +39,14 @@ export default function Epicentro() {
     setTasks(localTasks);
   }
 
+  // Otimização de Performance com useMemo para re-renderização fluida
+  const filteredTasks = useMemo(() => {
+    return tasks.sort((a, b) => {
+      if (a.is_important && !b.is_important) return -1;
+      return 0;
+    });
+  }, [tasks]);
+
   async function handleCompleteTask(id: string) {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
@@ -59,14 +67,13 @@ export default function Epicentro() {
     loadTasks();
   }
 
-  // Pega a primeira tarefa pendente ou importante para a Zona de Foco
   const priorityTask = tasks.find(t => t.status === 'pending');
 
   return (
     <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100 font-sans">
       <Header />
       
-      {/* Widget Interativo que abre a Zona de Foco */}
+      {/* Widget Interativo de Atividades / Zona de Foco */}
       <ActivityClock tasks={tasks} onOpenFocus={() => setIsFocusOpen(true)} />
 
       {/* Painel de Comando (Navegação) */}
@@ -87,10 +94,10 @@ export default function Epicentro() {
         </div>
       </div>
 
-      {/* Lista de Tarefas */}
+      {/* Lista de Tarefas Otimizada */}
       <div className="px-6 space-y-3">
         <AnimatePresence>
-          {tasks.length === 0 ? (
+          {filteredTasks.length === 0 ? (
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               className="text-center py-20 border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/10"
@@ -99,7 +106,7 @@ export default function Epicentro() {
               <p className="text-zinc-500 text-xs font-medium uppercase tracking-widest">Painel limpo</p>
             </motion.div>
           ) : (
-            tasks.map(task => (
+            filteredTasks.map(task => (
               <TaskCard 
                 key={task.id} 
                 task={task} 
