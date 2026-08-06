@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Plus, Heart, User, Briefcase, FileText, Coffee, Bookmark, Smile, Dumbbell, Home, ShoppingBag, Car, Plane, Shield, Zap, BookOpen, Music, Code } from 'lucide-react';
 import { db, Task, CheckItem, Category } from '../lib/db';
 import { supabase } from '../lib/supabase';
-import { syncPushTask } from '../lib/sync';
+import { syncPushTask, syncPushCategory } from '../lib/sync';
 import { triggerHaptic } from '../lib/haptics';
 import dynamic from 'next/dynamic';
 
@@ -17,7 +17,6 @@ interface TaskModalProps {
   initialTask?: Task | null;
 }
 
-// Lista completa de ícones categorizados para o modal avançado
 const ICON_CATEGORIES = [
   { category: 'Geral', icons: [User, Heart, Briefcase, FileText, Coffee, Bookmark, Home, ShoppingBag] },
   { category: 'Estilo de Vida', icons: [Smile, Dumbbell, Car, Plane, Shield, Zap, BookOpen, Music, Code] }
@@ -56,12 +55,14 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     let cats = await db.categories.toArray();
     if (cats.length === 0) {
       const defaultCats: Category[] = [
-        { name: 'Saúde', icon: 'Heart' },
-        { name: 'Pessoal', icon: 'User' },
-        { name: 'Trabalho', icon: 'Briefcase' },
-        { name: 'Documentos', icon: 'FileText' }
+        { id: crypto.randomUUID(), name: 'Saúde', icon: 'Heart' },
+        { id: crypto.randomUUID(), name: 'Pessoal', icon: 'User' },
+        { id: crypto.randomUUID(), name: 'Trabalho', icon: 'Briefcase' },
+        { id: crypto.randomUUID(), name: 'Documentos', icon: 'FileText' }
       ];
-      await db.categories.bulkAdd(defaultCats);
+      for (const cat of defaultCats) {
+        await db.categories.put(cat);
+      }
       cats = await db.categories.toArray();
     }
     setCategoriesList(cats);
@@ -71,11 +72,20 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     e.preventDefault();
     if (!newCatName.trim()) return;
     triggerHaptic('success');
-    await db.categories.add({ name: newCatName.trim(), icon: selectedIcon });
+    
+    const newCat: Category = {
+      id: crypto.randomUUID(),
+      name: newCatName.trim(),
+      icon: selectedIcon,
+      user_id: userId
+    };
+
+    // Salva na nuvem e local via sync
+    await syncPushCategory(newCat);
     setNewCatName('');
     setShowNewCatInput(false);
     loadCategories();
-    setCategory(newCatName.trim());
+    setCategory(newCat.name);
   }
 
   function handleVoiceInput() {
@@ -125,6 +135,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
       lat: reminderType === 'location' ? lat : undefined,
       lng: reminderType === 'location' ? lng : undefined,
       radius_meters: reminderType === 'location' ? radiusMeters : undefined,
+      updated_at: new Date().toISOString()
     };
 
     try {
@@ -142,7 +153,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   if (!isOpen) return null;
 
   return (
-    // Clicar no fundo fecha o modal (Backdrop Click)
+    // Clique fora do modal fecha (Backdrop Click)
     <div 
       onClick={(e) => { if (e.target === e.currentTarget) { triggerHaptic('light'); onClose(); } }}
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4 overflow-y-auto"
@@ -204,7 +215,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               <div className="space-y-3 mb-3 p-3.5 bg-zinc-950 border border-zinc-800 rounded-2xl animate-in fade-in">
                 <input 
                   type="text" 
-                  placeholder="Nome da categoria (Ex: Remédios)..." 
+                  placeholder="Nome da categoria..." 
                   value={newCatName} 
                   onChange={e => setNewCatName(e.target.value)} 
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-zinc-100 outline-none"
@@ -215,7 +226,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                     onClick={() => setIsIconPickerOpen(true)}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-indigo-300 font-semibold"
                   >
-                    <span>Escolher Ícone</span>
+                    <span>Ícone Selecionado: {selectedIcon}</span>
                   </button>
                   <button type="button" onClick={handleAddCategory} className="px-4 py-2 bg-indigo-600 text-xs font-bold text-white rounded-xl">Criar Categoria</button>
                 </div>
@@ -407,7 +418,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                         key={idx}
                         type="button"
                         onClick={() => {
-                          setSelectedIcon(group.category); // Simplificado ou nome do ícone
+                          setSelectedIcon(group.category);
                           setIsIconPickerOpen(false);
                           triggerHaptic('success');
                         }}
