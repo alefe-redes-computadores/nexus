@@ -52,24 +52,25 @@ export default function Epicentro() {
     <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100 font-sans">
       <Header />
       
-      {/* Widget de Atividades / Zona de Foco Colapsável */}
+      {/* Widget de Atividades / Zona de Foco Inteligente e Integrada */}
       <div className="px-6 mt-4">
         {isClockVisible ? (
-          <div className="relative bg-zinc-900/40 border border-zinc-800/80 rounded-3xl p-1 backdrop-blur-xl shadow-xl transition-all">
-            <ActivityClock tasks={tasks} onOpenFocus={() => setIsFocusOpen(true)} />
-            <div className="flex justify-end px-4 pb-2">
+          <div className="relative bg-zinc-900/60 border border-zinc-800/80 rounded-3xl p-4 backdrop-blur-xl shadow-xl transition-all">
+            <div className="flex justify-end mb-1">
               <button 
                 onClick={() => setIsClockVisible(false)}
                 className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors"
               >
-                Ocultar Painel
+                Ocultar
               </button>
             </div>
+            
+            <ActivityClock tasks={tasks} onOpenFocus={() => setIsFocusOpen(true)} />
           </div>
         ) : (
           <button 
             onClick={() => setIsClockVisible(true)}
-            className="w-full py-3 bg-zinc-900/40 border border-zinc-800/60 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-indigo-400 transition-all flex items-center justify-center gap-2 shadow-sm"
+            className="w-full py-2.5 bg-zinc-900/40 border border-zinc-800/60 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-indigo-400 transition-all flex items-center justify-center gap-2 shadow-sm"
           >
             <span>+ Exibir Zona de Foco</span>
           </button>
