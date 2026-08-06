@@ -10,15 +10,15 @@ import TaskModal from '../components/TaskModal';
 import TaskCard from '../components/TaskCard';
 import ActivityClock from '../components/ActivityClock';
 import FocusModeModal from '../components/FocusModeModal';
-import { Archive, ListTodo, CheckCircle2, Heart, Briefcase, User, BookOpen } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Epicentro() {
   const [user, setUser] = useState<any>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [view, setView] = useState<'pending' | 'archived'>('pending');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFocusOpen, setIsFocusOpen] = useState(false);
+  const [isClockVisible, setIsClockVisible] = useState(true); // Permite minimizar o relógio de foco
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   useEffect(() => {
@@ -32,14 +32,15 @@ export default function Epicentro() {
     });
     loadTasks();
     startGeofenceWatcher();
-  }, [view]);
+  }, []);
 
   async function loadTasks() {
-    const localTasks = await db.tasks.where('status').equals(view).toArray();
+    // Carrega apenas as tarefas pendentes na home principal
+    const localTasks = await db.tasks.where('status').equals('pending').toArray();
     setTasks(localTasks);
   }
 
-  // Otimização de Performance com useMemo para re-renderização fluida
+  // Otimização de Performance com useMemo
   const filteredTasks = useMemo(() => {
     return tasks.sort((a, b) => {
       if (a.is_important && !b.is_important) return -1;
@@ -50,7 +51,7 @@ export default function Epicentro() {
   async function handleCompleteTask(id: string) {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
-    const newStatus = view === 'pending' ? 'archived' : 'pending';
+    const newStatus = 'archived';
     await db.tasks.update(id, { status: newStatus });
     await supabase.from('tasks').update({ status: newStatus }).eq('id', id);
     loadTasks();
@@ -73,47 +74,37 @@ export default function Epicentro() {
     <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100 font-sans">
       <Header />
       
-      {/* Widget Interativo de Atividades / Zona de Foco */}
-      <ActivityClock tasks={tasks} onOpenFocus={() => setIsFocusOpen(true)} />
-
-      {/* Atalhos Rápidos (Smart Pills) com Ícones Nativos */}
-      <div className="px-6 mb-4 flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-        {[
-          { name: 'Saúde', icon: Heart },
-          { name: 'Trabalho', icon: Briefcase },
-          { name: 'Pessoal', icon: User },
-          { name: 'Estudos', icon: BookOpen }
-        ].map((pill) => (
+      {/* Widget de Atividades / Zona de Foco com opção de minimizar */}
+      {isClockVisible && (
+        <div className="relative">
+          <ActivityClock tasks={tasks} onOpenFocus={() => setIsFocusOpen(true)} />
           <button 
-            key={pill.name}
-            onClick={() => {
-              setView('pending');
-              setEditingTask({ title: '', category: pill.name, status: 'pending' } as any);
-              setIsModalOpen(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-2xl text-xs font-bold text-zinc-300 hover:bg-zinc-800 transition-all shrink-0 active:scale-95"
+            onClick={() => setIsClockVisible(false)}
+            className="absolute top-3 right-8 text-[10px] text-zinc-500 hover:text-zinc-300 uppercase tracking-widest font-bold"
           >
-            <pill.icon size={14} className="text-indigo-400" /> {pill.name}
-          </button>
-        ))}
-      </div>
-
-      {/* Painel de Comando (Navegação) */}
-      <div className="px-6 mb-6">
-        <div className="flex bg-zinc-900/50 p-1 rounded-2xl border border-zinc-800 backdrop-blur-sm">
-          <button 
-            onClick={() => setView('pending')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold transition-all ${view === 'pending' ? 'bg-indigo-600 text-white shadow-lg' : 'text-zinc-500'}`}
-          >
-            <ListTodo size={16} /> Pendentes
-          </button>
-          <button 
-            onClick={() => setView('archived')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold transition-all ${view === 'archived' ? 'bg-emerald-600 text-white shadow-lg' : 'text-zinc-500'}`}
-          >
-            <Archive size={16} /> Arquivados
+            Minimizar
           </button>
         </div>
+      )}
+
+      {/* Se o relógio estiver minimizado, exibe um botão discreto para reabri-lo */}
+      {!isClockVisible && (
+        <div className="px-6 mt-4">
+          <button 
+            onClick={() => setIsClockVisible(true)}
+            className="text-[10px] uppercase tracking-widest text-indigo-400 font-bold bg-indigo-950/30 border border-indigo-500/20 px-4 py-2 rounded-xl"
+          >
+            + Exibir Painel de Foco
+          </button>
+        </div>
+      )}
+
+      {/* Título de Seção Limpo (Sem abas de To Do) */}
+      <div className="px-6 mt-6 mb-4 flex items-center justify-between">
+        <h2 className="text-xs font-bold tracking-widest uppercase text-zinc-500">
+          Atividades Ativas ({filteredTasks.length})
+        </h2>
+        <div className="w-8 h-[2px] bg-zinc-900 rounded-full" />
       </div>
 
       {/* Lista de Tarefas Otimizada */}
