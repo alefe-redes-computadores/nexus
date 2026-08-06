@@ -3,10 +3,9 @@ import { useState, useEffect } from 'react';
 import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, Plus, Heart, User, Briefcase, FileText, Coffee, Bookmark } from 'lucide-react';
 import { db, Task, CheckItem, Category } from '../lib/db';
 import { supabase } from '../lib/supabase';
-import { syncPushTask } from '../lib/sync';
+import { syncPushTask } from '../lib/sync'; // <-- Única importação nova
 import dynamic from 'next/dynamic';
 
-// Importação dinâmica do componente de mapa para evitar erros de SSR no Next.js
 const MapPicker = dynamic(() => import('./MapPicker'), { ssr: false });
 
 interface TaskModalProps {
@@ -37,9 +36,8 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   const [reminderTime, setReminderTime] = useState(initialTask?.reminder_time || '');
   const [recurrence, setRecurrence] = useState<any>(initialTask?.recurrence || 'none');
   
-  // Localização via Mapa Interativo
   const [locationName, setLocationName] = useState(initialTask?.location_name || 'Local Selecionado no Mapa');
-  const [lat, setLat] = useState<number | undefined>(initialTask?.lat || -18.5808); // Patos de Minas como padrão
+  const [lat, setLat] = useState<number | undefined>(initialTask?.lat || -18.5808);
   const [lng, setLng] = useState<number | undefined>(initialTask?.lng || -46.5181);
   const [radiusMeters, setRadiusMeters] = useState(initialTask?.radius_meters || 100);
 
@@ -133,8 +131,8 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     };
 
     try {
-      // Sincronização automática integrada via syncPushTask
-      await syncPushTask(taskData);
+      // Alteração aqui: Chamando a função de sincronização automática
+      await syncPushTask(taskData); 
       onTaskCreated();
       onClose();
     } catch (err) {
@@ -299,7 +297,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
             </div>
           )}
 
-          {/* Seletor de Localização com Mapa Interativo e Raio Visual */}
           {reminderType === 'location' && (
             <div className="p-3.5 bg-zinc-950/40 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
               <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
@@ -331,12 +328,10 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                   onChange={(e) => setRadiusMeters(Number(e.target.value))}
                   className="w-full accent-indigo-500 bg-zinc-900 cursor-pointer"
                 />
-                <span className="text-[10px] text-zinc-500 block">O círculo azul no mapa indica a área de disparo.</span>
               </div>
             </div>
           )}
 
-          {/* Checklist com Checkboxes Interativos */}
           <div className="p-3.5 bg-zinc-950/40 border border-zinc-800/80 rounded-2xl space-y-2.5">
             <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
               <CheckSquare size={14} className="text-indigo-400" /> Checklist (Subtarefas)
