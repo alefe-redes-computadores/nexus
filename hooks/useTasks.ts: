@@ -1,0 +1,52 @@
+// hooks/useTasks.ts
+import { useState, useEffect, useMemo } from 'react';
+import { db, Task } from '../lib/db';
+import { supabase } from '../lib/supabase';
+import { processRecurrence } from '../lib/recurrence';
+
+export function useTasks(userId: string) {
+  const [tasks, setTasks] = useState<Task[]>([]);
+
+  const loadTasks = async () => {
+    const localTasks = await db.tasks.where('status').equals('pending').toArray();
+    setTasks(localTasks);
+  };
+
+  useEffect(() => {
+    loadTasks();
+  }, [userId]);
+
+  const categorizedTasks = useMemo(() => {
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    
+    const past: Task[] = [];
+    const today: Task[] = [];
+    const upcoming: Task[] = [];
+
+    tasks.forEach(t => {
+      if (!t.reminder_time) {
+        upcoming.push(t);
+        return;
+      }
+      const taskDateStr = t.reminder_time.slice(0, 10);
+      if (taskDateStr < todayStr) past.push(t);
+      else if (taskDateStr === todayStr) today.push(t);
+      else upcoming.push(t);
+    });
+
+    return { past, today, upcoming };
+  }, [tasks]);
+
+  const completeTask = async (id: string) => {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    
+    await db.tasks.update(id, { status: 'archived' });
+    await supabase.from('tasks').update({ status: 'archived' }).eq('id', id);
+    await processRecurrence(task);
+    loadTasks();
+  };
+
+  return { tasks, categorizedTasks, completeTask, loadTasks };
+}
