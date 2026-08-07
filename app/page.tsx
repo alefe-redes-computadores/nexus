@@ -15,6 +15,7 @@ import FocusModeModal from '../components/FocusModeModal';
 import StatsPanel from '../components/StatsPanel';
 import { CheckCircle2, Search, X, EyeOff, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation'; // <-- Importação do Router
 
 export default function Epicentro() {
   const [user, setUser] = useState<any>(null);
@@ -22,6 +23,7 @@ export default function Epicentro() {
   const [isFocusOpen, setIsFocusOpen] = useState(false);
   const [isClockVisible, setIsClockVisible] = useState(true);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const router = useRouter(); // <-- Inicialização do Router
 
   const {
     tasks,
@@ -42,22 +44,25 @@ export default function Epicentro() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       const u = data.session?.user;
-      setUser(u);
+      
       if (u) {
+        setUser(u);
         const cleanup = initAutoSync(u.id, loadTasks);
         return () => cleanup?.();
+      } else {
+        // CATRACA DE SEGURANÇA: Se não tem usuário, expulsa pro login!
+        router.replace('/login');
       }
     });
+    
     startGeofenceWatcher();
 
-    // Recupera o estado do painel de foco do Local Storage
     const savedFocusState = localStorage.getItem('@nexus:focusPanelVisible');
     if (savedFocusState !== null) {
       setIsClockVisible(savedFocusState === 'true');
     }
-  }, []);
+  }, [router]);
 
-  // Função para salvar o estado no Local Storage sempre que alterar
   const toggleFocusPanel = (isVisible: boolean) => {
     setIsClockVisible(isVisible);
     localStorage.setItem('@nexus:focusPanelVisible', String(isVisible));
@@ -91,6 +96,9 @@ export default function Epicentro() {
 
   const priorityTask = tasks.find(t => t.status === 'pending');
   const totalActive = tasks.length;
+
+  // Se o usuário ainda for null, não renderiza a tela enquanto não redireciona
+  if (!user) return null;
 
   return (
     <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-100 font-sans">
@@ -162,7 +170,6 @@ export default function Epicentro() {
         </div>
       )}
 
-      {/* Indicador de Filtro de Tag Ativo */}
       {activeTag && (
         <div className="px-6 mb-4 animate-in fade-in">
           <button 
