@@ -8,6 +8,7 @@ export default function Header() {
   const [user, setUser] = useState<any>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isTracking, setIsTracking] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,21 +31,33 @@ export default function Header() {
 
   async function handleLogout() {
     try {
-      // Limpa a sessão no Supabase e os dados locais
+      // 1. Encerra a sessão oficial no Supabase
       await supabase.auth.signOut();
-      await db.tasks.clear();
+      
+      // 2. Varredura de segurança: força a exclusão de qualquer token residual preso no cache
+      for (let key in localStorage) {
+        if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+          localStorage.removeItem(key);
+        }
+      }
+      
+      // 3. Limpa o banco local de tarefas (ignora erro se já estiver vazio)
+      await db.tasks.clear().catch(() => {});
+      
     } catch (error) {
-      console.error('Erro ao limpar dados:', error);
+      console.error('Erro forçando logout:', error);
     } finally {
-      // Força o navegador a recarregar a página limpando a memória do app
-      window.location.href = '/';
+      // 4. Usa o replace para limpar o histórico atual e recarregar do zero
+      window.location.replace('/');
     }
   }
 
-  // Busca a foto. O Google geralmente usa avatar_url ou picture
+  // Busca a foto nas duas fontes possíveis que o Google e o Supabase usam
   const meta = user?.user_metadata || {};
-  const avatar = meta.avatar_url || meta.picture;
-  const fullName = meta.full_name || 'Álefe';
+  const identity = user?.identities?.[0]?.identity_data || {};
+  
+  const avatar = meta.avatar_url || meta.picture || identity?.avatar_url || identity?.picture;
+  const fullName = meta.full_name || identity?.full_name || 'Álefe';
   const name = fullName.split(' ')[0];
 
   return (
@@ -77,16 +90,14 @@ export default function Header() {
             {name.charAt(0).toUpperCase()}
           </div>
 
-          {/* Imagem - Sem o crossOrigin que estava bloqueando */}
-          {avatar && (
+          {/* Imagem Controlada pelo Estado do React */}
+          {avatar && !imgError && (
             <img 
               src={avatar} 
               alt="Perfil" 
               referrerPolicy="no-referrer"
               className="absolute inset-0 w-10 h-10 rounded-full border-2 border-indigo-500/50 object-cover shadow-md shrink-0"
-              onError={(e) => {
-                (e.target as HTMLElement).style.display = 'none';
-              }}
+              onError={() => setImgError(true)}
             />
           )}
         </button>
