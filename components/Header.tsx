@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { db } from '../lib/db';
-import { Settings, Archive, LogOut, Radio } from 'lucide-react';
+import { Settings, Archive, LogOut, Radio, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function Header() {
@@ -40,7 +40,6 @@ export default function Header() {
     } catch (error) {
       console.error('Erro no logout:', error);
     } finally {
-      // Redireciona diretamente para a tela de login
       window.location.href = '/login';
     }
   }
@@ -99,6 +98,13 @@ export default function Header() {
               <p className="text-[10px] text-zinc-500 truncate">{user?.email}</p>
             </div>
             
+            <button 
+              onClick={() => { setMenuOpen(false); window.location.href = '/calendar'; }}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800/60 transition-all text-left"
+            >
+              <Calendar size={15} className="text-indigo-400" /> Calendário
+            </button>
+
             <button 
               onClick={() => { setMenuOpen(false); window.location.href = '/archive'; }}
               className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800/60 transition-all text-left"
