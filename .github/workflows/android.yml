@@ -55,9 +55,9 @@ jobs:
           chmod +x gradlew
           ./gradlew clean assembleDebug
 
-      - name: Disponibilizar APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Nexus-App
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 1
+      # - name: Disponibilizar APK
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: Nexus-App
+      #     path: android/app/build/outputs/apk/debug/app-debug.apk
+      #     retention-days: 1
