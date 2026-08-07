@@ -1,9 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { X, Mic, CheckSquare, Square, Star, Clock, MapPin, User, Briefcase, FileText, Coffee, Bookmark, Check, Trash2, Edit2, Eye, Tag, ImageIcon, Navigation } from 'lucide-react';
-import { db, Task, CheckItem, Category } from '../lib/db';
+import { db, Task, CheckItem } from '../lib/db';
 import { supabase } from '../lib/supabase';
-import { syncPushTask, syncPushCategory, uploadTaskAttachment } from '../lib/sync';
+import { syncPushTask, uploadTaskAttachment } from '../lib/sync';
 import { triggerHaptic } from '../lib/haptics';
 import dynamic from 'next/dynamic';
 
@@ -44,10 +44,10 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   const [tempCustomName, setTempCustomName] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const [categoriesList, setCategoriesList] = useState<Category[]>([]);
+  // Sistema Unificado de Categorias (Lido das Configurações)
+  const [categoriesList, setCategoriesList] = useState<string[]>(['Pessoal', 'Trabalho', 'Documentos', 'Alimentação', 'Geral']);
   const [showNewCatInput, setShowNewCatInput] = useState(false);
   const [newCatName, setNewCatName] = useState('');
-  const [selectedIcon, setSelectedIcon] = useState('User');
 
   const [activeTab, setActiveTab] = useState<'none' | 'category' | 'time' | 'location' | 'attachment' | 'checklist' | 'tags'>('none');
   const [isRecurrenceOpen, setIsRecurrenceOpen] = useState(false);
@@ -56,42 +56,40 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadCategories();
-  }, []);
-
-  async function loadCategories() {
-    let cats = await db.categories.toArray();
-    if (cats.length === 0) {
-      const defaultCats: Category[] = [
-        { id: crypto.randomUUID(), name: 'Pessoal', icon: 'User' },
-        { id: crypto.randomUUID(), name: 'Trabalho', icon: 'Briefcase' },
-        { id: crypto.randomUUID(), name: 'Documentos', icon: 'FileText' }
-      ];
-      for (const cat of defaultCats) {
-        await db.categories.put(cat);
-      }
-      cats = await db.categories.toArray();
+    if (isOpen) {
+      loadCategories();
     }
-    setCategoriesList(cats);
+  }, [isOpen]);
+
+  // Carrega as categorias do Local Storage (em sincronia com a página de Configurações)
+  function loadCategories() {
+    const savedCats = localStorage.getItem('@nexus:categories');
+    if (savedCats) {
+      try {
+        setCategoriesList(JSON.parse(savedCats));
+      } catch (e) {
+        console.error("Erro ao ler categorias do local storage");
+      }
+    }
   }
 
-  async function handleAddCategory(e: React.FormEvent) {
+  // Adiciona categoria nova e já salva globalmente
+  function handleAddCategory(e: React.FormEvent) {
     e.preventDefault();
-    if (!newCatName.trim()) return;
+    const catName = newCatName.trim();
+    if (!catName) return;
+    
     triggerHaptic('success');
     
-    const newCat: Category = {
-      id: crypto.randomUUID(),
-      name: newCatName.trim(),
-      icon: selectedIcon,
-      user_id: userId
-    };
-
-    await syncPushCategory(newCat);
+    if (!categoriesList.includes(catName)) {
+      const updated = [...categoriesList, catName];
+      setCategoriesList(updated);
+      localStorage.setItem('@nexus:categories', JSON.stringify(updated));
+    }
+    
     setNewCatName('');
     setShowNewCatInput(false);
-    loadCategories();
-    setCategory(newCat.name);
+    setCategory(catName);
   }
 
   function handleVoiceInput() {
@@ -121,7 +119,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
     setChecklist(checklist.map(item => item.id === id ? { ...item, completed: !item.completed } : item));
   }
 
-  // FASE C: Função para adicionar Tags Dinâmicas
   function addTag() {
     const cleanTag = newTag.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
     if (!cleanTag || tags.includes(cleanTag)) return;
@@ -184,7 +181,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
       is_important: isImportant,
       checklist,
       attachments, 
-      tags, // Adicionando as tags ao banco de dados
+      tags,
       recurrence,
       reminder_type: reminderType,
       reminder_time: reminderType === 'time' ? reminderTime : undefined,
@@ -255,7 +252,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               </button>
             </div>
 
-            {/* BARRA DE FERRAMENTAS INFERIOR ATUALIZADA COM TAGS */}
             <div className="flex items-center justify-between border-t border-zinc-800/60 pt-3 px-1">
               <button
                 type="button"
@@ -312,12 +308,11 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               </button>
             </div>
 
-            {/* GAVETA: TAGS DINÂMICAS */}
+            {/* GAVETA: TAGS */}
             {activeTab === 'tags' && (
               <div className="p-4 bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Etiquetas (Tags)</span>
                 
-                {/* Lista de Tags Adicionadas */}
                 <div className="flex flex-wrap gap-2 mb-1">
                   {tags.map((t) => (
                     <span key={t} className="flex items-center gap-1 px-2 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 rounded-lg text-[10px] font-bold">
@@ -330,7 +325,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                   {tags.length === 0 && <span className="text-xs text-zinc-600 italic">Nenhuma tag...</span>}
                 </div>
                 
-                {/* Input de Nova Tag */}
                 <div className="flex gap-2">
                   <input 
                     type="text" 
@@ -350,7 +344,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               </div>
             )}
 
-            {/* GAVETA: CATEGORIA */}
+            {/* GAVETA: CATEGORIA (AGORA LENDO AS CONFIGURAÇÕES LOCAIS) */}
             {activeTab === 'category' && (
               <div className="p-4 bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
                 <div className="flex justify-between items-center">
@@ -370,22 +364,22 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                   </div>
                 )}
                 <div className="space-y-1 max-h-40 overflow-y-auto">
-                  {categoriesList.map((cat) => (
+                  {categoriesList.map((catName) => (
                     <button 
-                      key={cat.id || cat.name}
+                      key={catName}
                       type="button"
-                      onClick={() => { triggerHaptic('light'); setCategory(cat.name); setActiveTab('none'); }}
-                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${category === cat.name ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30' : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800'}`}
+                      onClick={() => { triggerHaptic('light'); setCategory(catName); setActiveTab('none'); }}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${category === catName ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30' : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800'}`}
                     >
-                      <span>{cat.name}</span>
-                      {category === cat.name && <Check size={14} className="text-indigo-400" />}
+                      <span>{catName}</span>
+                      {category === catName && <Check size={14} className="text-indigo-400" />}
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* GAVETA: HORÁRIO E RECORRÊNCIA */}
+            {/* GAVETA: HORÁRIO */}
             {activeTab === 'time' && (
               <div className="p-4 bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
                 <div className="flex justify-between items-center">
@@ -493,7 +487,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
               </div>
             )}
 
-            {/* GAVETA: GALERIA DE ANEXOS LIMPA */}
+            {/* GAVETA: ANEXOS */}
             {activeTab === 'attachment' && (
               <div className="p-4 bg-zinc-950/90 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in">
                 <div className="flex justify-between items-center">
@@ -501,7 +495,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                   <span className="text-[10px] text-zinc-500">{attachments.length} arquivo(s)</span>
                 </div>
                 
-                {/* Grid de Miniaturas */}
                 {attachments.length > 0 && (
                   <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
                     {attachments.map((file, idx) => (
@@ -541,7 +534,7 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                                   type="button" 
                                   onClick={() => { setEditingAttachmentIndex(idx); setTempCustomName(file.name); }}
                                   className="p-1.5 bg-zinc-800 text-zinc-300 hover:text-indigo-400 rounded-lg transition-all"
-                                  title="Renomear Arquivo (Sem extensão)"
+                                  title="Renomear Arquivo"
                                 >
                                   <Edit2 size={13} />
                                 </button>
@@ -566,7 +559,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
                   </div>
                 )}
 
-                {/* Botão de Upload */}
                 <div className="text-center p-4 border border-dashed border-zinc-800 rounded-2xl bg-zinc-900/40">
                   <ImageIcon size={24} className="mx-auto text-indigo-400 mb-1" />
                   <p className="text-xs font-bold text-zinc-200">{uploadingFile ? 'Enviando para a nuvem...' : 'Adicionar novo arquivo'}</p>
@@ -620,7 +612,6 @@ export default function TaskModal({ isOpen, onClose, onTaskCreated, userId, init
 
       </div>
 
-      {/* LIGHTBOX / TELA CHEIA */}
       {previewUrl && (
         <div className="fixed inset-0 z-60 bg-black/95 backdrop-blur-md flex items-center justify-center p-4">
           <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col items-center">
