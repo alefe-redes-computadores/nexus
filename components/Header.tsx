@@ -36,9 +36,17 @@ export default function Header() {
     router.push('/');
   }
 
-  // Revertido para o padrão simples e direto que o Supabase usa e que funcionava antes
-  const avatar = user?.user_metadata?.avatar_url;
-  const fullName = user?.user_metadata?.full_name || 'Álefe';
+  // Busca a foto em todos os campos possíveis do Supabase/Google
+  const meta = user?.user_metadata || {};
+  const identity = user?.identities?.[0]?.identity_data || {};
+  
+  const avatar = 
+    meta.avatar_url || 
+    meta.picture || 
+    identity.avatar_url || 
+    identity.picture;
+
+  const fullName = meta.full_name || identity.full_name || 'Álefe';
   const name = fullName.split(' ')[0];
 
   return (
@@ -75,6 +83,7 @@ export default function Header() {
               src={avatar} 
               alt="Perfil" 
               referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
               className="absolute inset-0 w-10 h-10 rounded-full border-2 border-indigo-500/50 object-cover shadow-md shrink-0"
               onError={(e) => {
                 (e.target as HTMLElement).style.display = 'none';
