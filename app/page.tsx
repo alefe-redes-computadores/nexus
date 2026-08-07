@@ -30,6 +30,8 @@ export default function Epicentro() {
     setSearchQuery,
     isSearchOpen,
     setIsSearchOpen,
+    activeTag,
+    setActiveTag,
     handleCompleteTask,
     handleToggleCheck,
     loadTasks
@@ -160,6 +162,18 @@ export default function Epicentro() {
         </div>
       )}
 
+      {/* Indicador de Filtro de Tag Ativo */}
+      {activeTag && (
+        <div className="px-6 mb-4 animate-in fade-in">
+          <button 
+            onClick={() => setActiveTag(null)}
+            className="flex items-center gap-2 bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 px-3 py-1.5 rounded-xl text-xs font-bold w-max hover:bg-indigo-600/30 transition-all"
+          >
+            Filtrando por #{activeTag} <X size={12} />
+          </button>
+        </div>
+      )}
+
       <div className="px-6 space-y-6">
         <AnimatePresence>
           {totalActive === 0 ? (
@@ -183,6 +197,7 @@ export default function Epicentro() {
                       onComplete={handleCompleteTask} 
                       onEdit={(t: Task) => { setEditingTask(t); setIsModalOpen(true); }} 
                       onToggleCheck={handleToggleCheck}
+                      setActiveTag={setActiveTag}
                     />
                   ))}
                 </div>
@@ -199,6 +214,7 @@ export default function Epicentro() {
                       onComplete={handleCompleteTask} 
                       onEdit={(t: Task) => { setEditingTask(t); setIsModalOpen(true); }} 
                       onToggleCheck={handleToggleCheck}
+                      setActiveTag={setActiveTag}
                     />
                   ))}
                 </div>
@@ -215,6 +231,7 @@ export default function Epicentro() {
                       onComplete={handleCompleteTask} 
                       onEdit={(t: Task) => { setEditingTask(t); setIsModalOpen(true); }} 
                       onToggleCheck={handleToggleCheck}
+                      setActiveTag={setActiveTag}
                     />
                   ))}
                 </div>
