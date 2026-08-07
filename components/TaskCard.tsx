@@ -11,7 +11,7 @@ const ICONS_MAP: any = {
   Geral: Bookmark 
 };
 
-export default function TaskCard({ task, sectionType, onComplete, onEdit, onToggleCheck, onSnooze }: any) {
+export default function TaskCard({ task, sectionType, onComplete, onEdit, onToggleCheck, onSnooze, setActiveTag }: any) {
   const Icon = ICONS_MAP[task.category] || Bookmark;
   
   const x = useMotionValue(0);
@@ -60,14 +60,17 @@ export default function TaskCard({ task, sectionType, onComplete, onEdit, onTogg
                 {task.is_important && <Star size={14} className="text-amber-400 fill-amber-400" />}
               </div>
               
-              {/* FASE C: Categorias e Tags Dinâmicas renderizadas lado a lado */}
               <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
                 <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mr-1">{task.category}</span>
                 
                 {task.tags && task.tags.map((tag: string) => (
-                  <span key={tag} className="px-1.5 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[8px] font-bold tracking-wider uppercase">
+                  <button 
+                    key={tag} 
+                    onClick={(e) => { e.stopPropagation(); if (setActiveTag) setActiveTag(tag); }} 
+                    className="px-1.5 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[8px] font-bold tracking-wider uppercase hover:bg-indigo-500/20 transition-all cursor-pointer"
+                  >
                     #{tag}
-                  </span>
+                  </button>
                 ))}
 
                 {task.reminder_time && (
@@ -108,7 +111,6 @@ export default function TaskCard({ task, sectionType, onComplete, onEdit, onTogg
           </div>
         </div>
 
-        {/* Checklist Integrado no Card */}
         {task.checklist && task.checklist.length > 0 && (
           <div className="space-y-1.5 pl-2 border-l border-zinc-800 ml-1 pt-1">
             {task.checklist.map((item: any) => (
@@ -124,7 +126,6 @@ export default function TaskCard({ task, sectionType, onComplete, onEdit, onTogg
           </div>
         )}
 
-        {/* Galeria de Miniaturas Direto no Card (Nomes Limpos sem Extensão) */}
         {task.attachments && task.attachments.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-2 border-t border-zinc-800/80 mt-1">
             {task.attachments.map((file: any, idx: number) => (
