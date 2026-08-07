@@ -33,23 +33,18 @@ export default function Header() {
 
   async function handleLogout() {
     try {
-      // 1. Encerra a sessão oficial no Supabase
       await supabase.auth.signOut();
-      
-      // 2. Limpa cache local e banco de tarefas
       localStorage.clear();
       sessionStorage.clear();
       await db.tasks.clear().catch(() => {});
-      
     } catch (error) {
       console.error('Erro no logout:', error);
     } finally {
-      // 3. Redireciona para a raiz
-      window.location.href = '/';
+      // Redireciona diretamente para a tela de login
+      window.location.href = '/login';
     }
   }
 
-  // Busca a foto nas duas fontes possíveis
   const meta = user?.user_metadata || {};
   const identity = user?.identities?.[0]?.identity_data || {};
   
@@ -82,12 +77,10 @@ export default function Header() {
           onClick={() => setMenuOpen(!menuOpen)}
           className="focus:outline-none transition-transform active:scale-95 block relative"
         >
-          {/* Inicial (Fallback) */}
           <div className="w-10 h-10 rounded-full bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold text-xs shrink-0">
             {name.charAt(0).toUpperCase()}
           </div>
 
-          {/* Imagem Controlada pelo Estado do React */}
           {avatar && !imgError && (
             <img 
               src={avatar} 
