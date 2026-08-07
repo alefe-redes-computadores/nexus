@@ -11,13 +11,36 @@ interface FocusModeProps {
   onCompleteTask: (id: string) => void;
 }
 
-const FOCUS_TIME = 25 * 60; // 25 minutos
-const BREAK_TIME = 5 * 60;  // 5 minutos
-
 export default function FocusModeModal({ isOpen, onClose, priorityTask, onCompleteTask }: FocusModeProps) {
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
-  const [secondsLeft, setSecondsLeft] = useState(FOCUS_TIME);
   const [isActive, setIsActive] = useState(false);
+  
+  // Estados dinâmicos puxados das configurações
+  const [focusDuration, setFocusDuration] = useState(25 * 60);
+  const [breakDuration, setBreakDuration] = useState(5 * 60);
+  const [secondsLeft, setSecondsLeft] = useState(25 * 60);
+
+  // Carrega as configurações de tempo sempre que o modal abrir
+  useEffect(() => {
+    if (isOpen) {
+      const savedFocus = localStorage.getItem('@nexus:focusTime');
+      const savedBreak = localStorage.getItem('@nexus:breakTime');
+      
+      const fTime = savedFocus ? Number(savedFocus) * 60 : 25 * 60;
+      const bTime = savedBreak ? Number(savedBreak) * 60 : 5 * 60;
+      
+      setFocusDuration(fTime);
+      setBreakDuration(bTime);
+      
+      // Só reseta o relógio se não estiver rodando
+      if (!isActive) {
+        setMode('focus');
+        setSecondsLeft(fTime);
+      }
+    } else {
+      setIsActive(false); // Pausa se fechar o modal
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     let interval: any = null;
@@ -25,30 +48,20 @@ export default function FocusModeModal({ isOpen, onClose, priorityTask, onComple
     if (isActive && secondsLeft > 0) {
       interval = setInterval(() => setSecondsLeft(prev => prev - 1), 1000);
     } else if (isActive && secondsLeft === 0) {
-      // Quando o tempo acaba!
       triggerHaptic('heavy');
       setIsActive(false);
       
-      // Troca automática de modo
       if (mode === 'focus') {
         setMode('break');
-        setSecondsLeft(BREAK_TIME);
+        setSecondsLeft(breakDuration);
       } else {
         setMode('focus');
-        setSecondsLeft(FOCUS_TIME);
+        setSecondsLeft(focusDuration);
       }
     }
     
     return () => clearInterval(interval);
-  }, [isActive, secondsLeft, mode]);
-
-  // Se o modal for fechado, garantimos que o timer pause para não rodar fantasma 
-  // (opcional: se quiser que rode em segundo plano, é só remover esse useEffect)
-  useEffect(() => {
-    if (!isOpen) {
-      setIsActive(false);
-    }
-  }, [isOpen]);
+  }, [isActive, secondsLeft, mode, focusDuration, breakDuration]);
 
   if (!isOpen) return null;
 
@@ -63,7 +76,7 @@ export default function FocusModeModal({ isOpen, onClose, priorityTask, onComple
     triggerHaptic('light');
     setIsActive(false);
     setMode(newMode);
-    setSecondsLeft(newMode === 'focus' ? FOCUS_TIME : BREAK_TIME);
+    setSecondsLeft(newMode === 'focus' ? focusDuration : breakDuration);
   }
 
   return (
@@ -74,7 +87,6 @@ export default function FocusModeModal({ isOpen, onClose, priorityTask, onComple
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 bg-zinc-950/98 backdrop-blur-3xl flex flex-col justify-between p-6 font-sans text-zinc-100"
       >
-        {/* Topo */}
         <div className="flex justify-between items-center">
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors ${isFocus ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
             {isFocus ? <Flame size={14} /> : <Coffee size={14} />}
@@ -90,7 +102,6 @@ export default function FocusModeModal({ isOpen, onClose, priorityTask, onComple
           </button>
         </div>
 
-        {/* Centro - Tarefa em Destaque e Timer */}
         <div className="flex flex-col items-center text-center space-y-6 my-auto">
           {priorityTask && isFocus ? (
             <div className="space-y-3 max-w-sm animate-in fade-in slide-in-from-bottom-2">
@@ -121,30 +132,27 @@ export default function FocusModeModal({ isOpen, onClose, priorityTask, onComple
             </div>
           )}
 
-          {/* Seletor de Modo */}
           <div className="flex bg-zinc-900/50 border border-zinc-800 p-1 rounded-2xl">
             <button 
               onClick={() => handleSwitchMode('focus')}
               className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${isFocus ? 'bg-zinc-800 text-indigo-400 shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
             >
-              Foco (25m)
+              Foco ({focusDuration / 60}m)
             </button>
             <button 
               onClick={() => handleSwitchMode('break')}
               className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${!isFocus ? 'bg-zinc-800 text-emerald-400 shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
             >
-              Pausa (5m)
+              Pausa ({breakDuration / 60}m)
             </button>
           </div>
 
-          {/* Relógio / Timer de Foco */}
           <div className="relative flex items-center justify-center py-4">
             <div className={`text-7xl font-black tracking-tighter font-mono transition-colors duration-500 ${isFocus ? 'text-indigo-400' : 'text-emerald-400'}`}>
               {formattedTime}
             </div>
           </div>
 
-          {/* Controles do Timer */}
           <div className="flex items-center gap-4">
             <button 
               onClick={() => { triggerHaptic('medium'); setIsActive(!isActive); }}
@@ -156,7 +164,7 @@ export default function FocusModeModal({ isOpen, onClose, priorityTask, onComple
             <button 
               onClick={() => { 
                 triggerHaptic('light'); 
-                setSecondsLeft(isFocus ? FOCUS_TIME : BREAK_TIME); 
+                setSecondsLeft(isFocus ? focusDuration : breakDuration); 
                 setIsActive(false); 
               }}
               className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-all"
@@ -167,7 +175,6 @@ export default function FocusModeModal({ isOpen, onClose, priorityTask, onComple
           </div>
         </div>
 
-        {/* Rodapé - Ação de Concluir Tarefa Focada */}
         <div className="pb-4 min-h-[64px]">
           {priorityTask && isFocus && (
             <button 
