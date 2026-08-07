@@ -1,30 +1,41 @@
-// lib/recurrence.ts
-import { Task } from './db';
+import { db, Task } from './db';
+import { supabase } from './supabase';
 import { syncPushTask } from './sync';
 
 export async function processRecurrence(task: Task) {
+  // Se a tarefa não tem recorrência ou se a recorrência for 'none', não faz nada
   if (!task.recurrence || task.recurrence === 'none') return;
 
-  // Define a base de tempo para a próxima ocorrência
-  const baseDate = task.reminder_time ? new Date(task.reminder_time) : new Date();
-  
+  const originalTime = task.reminder_time ? new Date(task.reminder_time) : new Date();
+  const nextTime = new Date(originalTime);
+
+  // Calcula a data da próxima ocorrência com base na regra escolhida
   if (task.recurrence === 'daily') {
-    baseDate.setDate(baseDate.getDate() + 1);
+    nextTime.setDate(nextTime.getDate() + 1);
   } else if (task.recurrence === 'weekly') {
-    baseDate.setDate(baseDate.getDate() + 7);
+    nextTime.setDate(nextTime.getDate() + 7);
   } else if (task.recurrence === 'monthly') {
-    baseDate.setMonth(baseDate.getMonth() + 1);
+    nextTime.setMonth(nextTime.getMonth() + 1);
+  } else {
+    return;
   }
 
-  const nextTask: Task = {
+  // Cria a nova tarefa clonando a original, mas com o ID novo e a data atualizada
+  const newTask: Task = {
     ...task,
-    id: crypto.randomUUID(), // Novo ID único para a nova ocorrência
-    status: 'pending',
-    reminder_time: task.reminder_time ? baseDate.toISOString() : undefined,
-    notified: false, // Reseta o gatilho de notificação para o novo dia
+    id: crypto.randomUUID(), // Novo ID único
+    status: 'pending',       // Volta como pendente para aparecer na tela
+    reminder_time: task.reminder_time ? nextTime.toISOString() : undefined,
+    notified: false,         // Reseta o alarme para disparar na nova data
     updated_at: new Date().toISOString()
   };
 
-  // Salva e sincroniza automaticamente local e nuvem
-  await syncPushTask(nextTask);
+  try {
+    // Salva no banco local (Dexie) e sincroniza com a nuvem (Supabase)
+    await db.tasks.put(newTask);
+    await syncPushTask(newTask);
+    console.log(`Recorrência processada: Nova tarefa gerada para ${nextTime.toLocaleDateString('pt-BR')}`);
+  } catch (err) {
+    console.error('Erro ao gerar tarefa recorrente:', err);
+  }
 }
