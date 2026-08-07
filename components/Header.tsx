@@ -3,14 +3,12 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { db } from '../lib/db';
 import { Settings, Archive, LogOut, Radio } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 
 export default function Header() {
   const [user, setUser] = useState<any>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isTracking, setIsTracking] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -31,22 +29,22 @@ export default function Header() {
   }, []);
 
   async function handleLogout() {
-    await supabase.auth.signOut();
-    await db.tasks.clear();
-    router.push('/');
+    try {
+      // Limpa a sessão no Supabase e os dados locais
+      await supabase.auth.signOut();
+      await db.tasks.clear();
+    } catch (error) {
+      console.error('Erro ao limpar dados:', error);
+    } finally {
+      // Força o navegador a recarregar a página limpando a memória do app
+      window.location.href = '/';
+    }
   }
 
-  // Busca a foto em todos os campos possíveis do Supabase/Google
+  // Busca a foto. O Google geralmente usa avatar_url ou picture
   const meta = user?.user_metadata || {};
-  const identity = user?.identities?.[0]?.identity_data || {};
-  
-  const avatar = 
-    meta.avatar_url || 
-    meta.picture || 
-    identity.avatar_url || 
-    identity.picture;
-
-  const fullName = meta.full_name || identity.full_name || 'Álefe';
+  const avatar = meta.avatar_url || meta.picture;
+  const fullName = meta.full_name || 'Álefe';
   const name = fullName.split(' ')[0];
 
   return (
@@ -74,16 +72,17 @@ export default function Header() {
           onClick={() => setMenuOpen(!menuOpen)}
           className="focus:outline-none transition-transform active:scale-95 block relative"
         >
+          {/* Inicial (Fallback) */}
           <div className="w-10 h-10 rounded-full bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold text-xs shrink-0">
             {name.charAt(0).toUpperCase()}
           </div>
 
+          {/* Imagem - Sem o crossOrigin que estava bloqueando */}
           {avatar && (
             <img 
               src={avatar} 
               alt="Perfil" 
               referrerPolicy="no-referrer"
-              crossOrigin="anonymous"
               className="absolute inset-0 w-10 h-10 rounded-full border-2 border-indigo-500/50 object-cover shadow-md shrink-0"
               onError={(e) => {
                 (e.target as HTMLElement).style.display = 'none';
@@ -100,14 +99,14 @@ export default function Header() {
             </div>
             
             <button 
-              onClick={() => { setMenuOpen(false); router.push('/archive'); }}
+              onClick={() => { setMenuOpen(false); window.location.href = '/archive'; }}
               className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800/60 transition-all text-left"
             >
               <Archive size={15} className="text-indigo-400" /> Arquivados
             </button>
 
             <button 
-              onClick={() => { setMenuOpen(false); router.push('/settings'); }}
+              onClick={() => { setMenuOpen(false); window.location.href = '/settings'; }}
               className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800/60 transition-all text-left"
             >
               <Settings size={15} className="text-indigo-400" /> Configurações
